@@ -19,7 +19,7 @@ require(fastDummies)
 
 
 # Check data objects
-if(unique(rownames(colData(speOb)) == rownames(pca_ob)) == TRUE){
+if(unique(rownames(colData(speOb)) == rownames(pcaOb)) == TRUE){
   print("Data matches between spe colData and PCA data")
 }else{
   print("ERROR: Mismatched spe colData and PCA data, check data is consistent")
