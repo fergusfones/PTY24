@@ -19,7 +19,7 @@ topGenes <- rownames(de_genes_toptable)
 
 # This tests for enrichment in the mouse single cell dataset
 # Start out with 100 for quick running but when we run the analysis "finally" make this 10,000 reps
-results <- EWCE::bootstrap_enrichment_test(sct_data = MouseCTD,
+results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
                                                 sctSpecies = "mouse",
                                                 genelistSpecies = "mouse",
                                                 hits = topGenes, 
