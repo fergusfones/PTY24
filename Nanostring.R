@@ -452,10 +452,10 @@ library(edgeR)
 library(limma)
 
 
-dge <- SE2DGEList(spe_EC_rest_ruv_post)
+dge <- SE2DGEList(spe_CA1_neun_ruv_post)
 
 
-design <- model.matrix(~0 + Group + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_EC_rest_ruv_post))
+design <- model.matrix(~0 + Group + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_CA1_neun_ruv_post))
 
 #table(colData(spe_ruv)$population,colData(spe_ruv)$grossRegion)
 
@@ -486,14 +486,14 @@ text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,
 
 v <- voom(dge, design)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
 
-v <- voom(dge, design,block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
+v <- voom(dge, design,block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
             corfit$consensus)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
 
-fit <- lmFit(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
+fit <- lmFit(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
                corfit$consensus)
 
 fit2 <- contrasts.fit(fit, contr.matrix)
