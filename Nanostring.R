@@ -10,11 +10,11 @@ library(readr)
 library(ggpubr)
 library(edgeR)
 library(limma)
-#if (!require("BiocManager", quietly = TRUE))
-  #install.packages("BiocManager")
-
-#BiocManager::install("GeomxTools")
 library(GeomxTools)
+library(SpatialDecon)
+library(fastDummies)  
+library(reshape2)
+library(dplyr)
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 countData <- read.csv("preProcessedCountData_filtered.csv",header = T,)
@@ -41,7 +41,7 @@ rowData(spe)[1:5,1:5]
 
 metaData(spe)$NegProbes[,1:5]
 
-plotSampleInfo(spe, column2plot = c("SlideName","grossRegion", "population", "Group"))
+plotSampleInfo(spe, column2plot = c("Group", "SlideName", "grossRegion", "population"))
 
 head(spe)
 
@@ -59,6 +59,7 @@ plotGeneQC(spe, ordannots = "grossRegion", col = grossRegion, point_size = 2, to
 # only 5 genes removed
 
 spe <- addPerROIQC(spe)
+
 plotGeneQC(spe)
 # i think its adding the removed gene function to spe.
 
@@ -134,23 +135,71 @@ plotDR(spe, dimred = "UMAP", col = Group)
 # Normalisation
 
 spe_tmm <- geomxNorm(spe, method = "TMM")
+spe_tmm <- addPerROIQC(spe_tmm, rm_genes = FALSE)
+
 plotRLExpr(spe_tmm, assay = 2, color = Group) + ggtitle("TMM")
 
 #spe_cpm <- geomxNorm(spe, method = "CPM")
 #plotRLExpr(spe_cpm, assay = 2, color = population) + ggtitle("CPM")
 
+NormCountData <- assay(spe_tmm)
+# NormCountData<- NormCountData[-which(NormCountData$TargetName %in% duplicates),]
+# rownames(NormCountData) <- subCountData$ProbeDisplayName
+norm <- NormCountData
+negSet<- subCountData[grep("NegProbe",subCountData$TargetName),14:108]
+negNames <- subCountData[grep("NegProbe",subCountData$TargetName),"ProbeDisplayName"]
+rownames(negSet) <- negNames
+norm <- rbind(norm,negSet)
+
+bg2 = derive_GeoMx_background(norm = norm,
+                              probepool = rep(1, nrow(norm)),negnames = negNames)
+
+mousebrain <- download_profile_matrix(species = "Mouse",
+                                      age_group = "Adult", 
+                                      matrixname = "Brain_AllenBrainAtlas")
+dim(norm)
+norm <- norm[-which(rownames(norm) %in% negNames),]
+subCountData <- subCountData[which(subCountData$TargetName %in% rownames(norm)),]
+rownames(subCountData) <- subCountData$TargetName
+raw <- subCountData[,14:108]
+
+resNormRaw <- spatialdecon(norm = as.matrix(norm),
+                           raw = as.matrix(raw),
+                           bg = bg2,
+                           X = mousebrain,
+                           align_genes = TRUE)
+
+save(resNormRaw, file = "/Users/fergusfones/Desktop/Nanostring/resNormRaw.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/resNormRaw.Rdata")
+
+cellConvert <- read.csv("CellLabels_Allen.csv",header = T,skip = 1)
+cellConvert <- cellConvert[,-1]
+cellConvert$Main[which(cellConvert$Main %in% c("Glutamatergic","GABAergic"))] <- "Neuronal"
+cellConvert$cellLabs <- gsub("[/-]", ".", cellConvert$Granular)
+cellConvert$cellLabs <- gsub(" ", ".", cellConvert$cellLabs)
+table(cellConvert$cellLabs %in% rownames(resNormRaw$prop_of_all))
+rownames(cellConvert) <- cellConvert$cellLabs
+cellSubProp <- as.data.frame(resNormRaw$prop_of_all)
+cellSubProp <- cbind(cellSubProp,as.character(cellConvert[rownames(cellSubProp),"Main"]))
+colnames(cellSubProp)[ncol(cellSubProp)] <- "BroadCell"
+cellSubPropLong<- melt(cellSubProp,id.vars = "BroadCell")
+cellSubPropLong <- cellSubPropLong %>% group_by(variable,BroadCell) %>% reframe(sum(value))
+cellSubProp  <- dcast(cellSubPropLong,variable~BroadCell)
+
+colData(spe)
+colData(spe)[42:45] <- cellSubProp[, 2:5]
+colnames(colData(spe))[42:45] <- c( "Astro" , "Immune_Vascular" , "Neuronal" , "Oligo")
+
+#####################################################
+
 set.seed(100)
 
 spe_tmm <- scater::runPCA(spe_tmm)
 
-#spe_cpm <- scater::runPCA(spe_cpm)
-# 'You're computing too large a percentage of total singular values, use a standard svd instead'
-
 pca_results_tmm <- reducedDim(spe_tmm, "PCA")
-#pca_results_cpm <- reducedDim(spe_cpm, "PCA")
+
 
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = Group)
-plotPairPCA(spe_cpm, precomputed = pca_results_cpm, color = Group)
 
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = grossRegion)
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
@@ -179,8 +228,9 @@ spe_CA1_rest <- findNCGs(spe_CA1_rest, batch_name = "SlideName", top_n = 300)
 spe_EC_neun <- findNCGs(spe_EC_neun, batch_name = "SlideName", top_n = 300)
 spe_EC_rest <- findNCGs(spe_EC_rest, batch_name = "SlideName", top_n = 300)
 
+
 for(i in seq(5)){
-  spe_CA1_neun_ruv_post <- geomxBatchCorrection(spe_CA1_neun, factors = c("Group","grossRegion"), 
+  spe_CA1_neun_ruv_post <- geomxBatchCorrection(spe_CA1_neun, factors = c("Group"), 
                                                 NCGs = metadata(spe_CA1_neun)$NCGs, k = i)
   
   print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -188,7 +238,7 @@ for(i in seq(5)){
 }
 
 for(i in seq(5)){
-  spe_CA1_rest_ruv_post <- geomxBatchCorrection(spe_CA1_rest, factors = c("Group","grossRegion"), 
+  spe_CA1_rest_ruv_post <- geomxBatchCorrection(spe_CA1_rest, factors = c("Group"), 
                                                 NCGs = metadata(spe_CA1_rest)$NCGs, k = i)
   
   print(plotPairPCA(spe_CA1_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -196,15 +246,13 @@ for(i in seq(5)){
 }
 
 for(i in seq(5)){
-  spe_EC_neun_ruv_post <- geomxBatchCorrection(spe_EC_neun, factors = c("Group","grossRegion"), 
+  spe_EC_neun_ruv_post <- geomxBatchCorrection(spe_EC_neun, factors = c("Astro"), 
                                                NCGs = metadata(spe_EC_neun)$NCGs, k = i)
-  
-  print(plotPairPCA(spe_EC_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
   
 }
 
 for(i in seq(5)){
-  spe_EC_rest_ruv_post <- geomxBatchCorrection(spe_EC_rest, factors = c("Group","grossRegion"), 
+  spe_EC_rest_ruv_post <- geomxBatchCorrection(spe_EC_rest, factors = c("Group"), 
                                                NCGs = metadata(spe_EC_rest)$NCGs, k = i)
   
   print(plotPairPCA(spe_EC_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -452,10 +500,10 @@ library(edgeR)
 library(limma)
 
 
-dge <- SE2DGEList(spe_CA1_neun_ruv_post)
+dge <- SE2DGEList(spe_EC_neun_ruv_post)
 
 
-design <- model.matrix(~0 + Group + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_CA1_neun_ruv_post))
+design <- model.matrix(~0 + Group + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_EC_neun_ruv_post))
 
 #table(colData(spe_ruv)$population,colData(spe_ruv)$grossRegion)
 
@@ -486,14 +534,14 @@ text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,
 
 v <- voom(dge, design)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no.)
 
-v <- voom(dge, design,block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
+v <- voom(dge, design,block = colData(spe_EC_neun_ruv_post)$Histology.no., correlation =
             corfit$consensus)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no.)
 
-fit <- lmFit(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
+fit <- lmFit(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no., correlation =
                corfit$consensus)
 
 fit2 <- contrasts.fit(fit, contr.matrix)
