@@ -43,6 +43,7 @@ combinedref <- RowMergeSparseMatrices(WTref, TGref)
 ################## szi kay stuff
 
 long_reads<- read.delim("/Users/fergusfones/Desktop/Nanostring/rTg4510SCN_collapsed_RulesFilter_result_classification_counts.txt")
+phenotypes <- read.csv("/Users/fergusfones/Desktop/Nanostring/SCNPhenotype.csv")
 
 Gfap <- long_reads[long_reads$associated_gene == "Gfap",] %>%
   select(contains("mapped")) %>%
@@ -61,10 +62,7 @@ Gfap %>% reshape2::melt(variable.name = "sample",value.name = "reads") %>%
   mutate(group = factor(group, levels = c("WT","TG"))) %>%
   ggplot(., aes(x = group, y = reads, colour = cell)) + geom_boxplot()
 
-head(Gfap)
-phenotypes <- read.csv("/Users/fergusfones/Desktop/Nanostring/SCNPhenotype.csv")
 
-sum(long_reads$DN_15_mapped[long_reads$associated_gene == "Gm7502"])
 
 library(dplyr)
 # n_distinct(long_reads$associated_gene)
