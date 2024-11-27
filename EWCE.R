@@ -14,13 +14,13 @@ mouseCTD <- ewceData::ctd()
 
 #Let's use an example topTable for one brain region
 #subset significant DEG's from your toptables 
-de_genes_toptable <- topTable(fit2, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5)
+de_genes_toptable_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5)
 offTargets <- c("Wdr60", "Esyt2", "Ncapg2","Ptprn2","Fgf14")
 #Manually remove any known off-targets
-de_genes_toptable <- de_genes_toptable[-which(rownames(de_genes_toptable) %in% offTargets),]
+de_genes_toptable_CA1_rest <- de_genes_toptable_CA1_rest[-which(rownames(de_genes_toptable_CA1_rest) %in% offTargets),]
 
 #finally subset the list of names for your DEGs
-topGenes <- rownames(de_genes_toptable)
+topGenes <- rownames(de_genes_toptable_CA1_rest)
 
 
 # This tests for enrichment in the mouse single cell dataset
@@ -32,8 +32,12 @@ results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
                                            reps = 100,
                                            annotLevel = 1)
 
+saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
+
+results_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
+
 #Take out the enrichment results
-ewceRes <- results$results 
+ewceRes <- results_CA1_rest$results
 
 
 # This method only tests for positive enrichment (sd_from_mean < 0 == NA)

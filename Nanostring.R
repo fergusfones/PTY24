@@ -15,6 +15,8 @@ library(SpatialDecon)
 library(fastDummies)  
 library(reshape2)
 library(dplyr)
+library(ggrepel)
+
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 countData <- read.csv("preProcessedCountData_filtered.csv",header = T,)
@@ -228,9 +230,12 @@ spe_CA1_rest <- findNCGs(spe_CA1_rest, batch_name = "SlideName", top_n = 300)
 spe_EC_neun <- findNCGs(spe_EC_neun, batch_name = "SlideName", top_n = 300)
 spe_EC_rest <- findNCGs(spe_EC_rest, batch_name = "SlideName", top_n = 300)
 
+spe <- scater::runPCA(spe)
+pca_results <- reducedDim(spe, "PCA")
+plotPairPCA(spe, precomputed = pca_results, color = Astro)
 
 for(i in seq(5)){
-  spe_CA1_neun_ruv_post <- geomxBatchCorrection(spe_CA1_neun, factors = c("Group"), 
+  spe_CA1_neun_ruv_post <- geomxBatchCorrection(spe_CA1_neun, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                 NCGs = metadata(spe_CA1_neun)$NCGs, k = i)
   
   print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -238,7 +243,7 @@ for(i in seq(5)){
 }
 
 for(i in seq(5)){
-  spe_CA1_rest_ruv_post <- geomxBatchCorrection(spe_CA1_rest, factors = c("Group"), 
+  spe_CA1_rest_ruv_post <- geomxBatchCorrection(spe_CA1_rest, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                 NCGs = metadata(spe_CA1_rest)$NCGs, k = i)
   
   print(plotPairPCA(spe_CA1_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -246,13 +251,15 @@ for(i in seq(5)){
 }
 
 for(i in seq(5)){
-  spe_EC_neun_ruv_post <- geomxBatchCorrection(spe_EC_neun, factors = c("Astro"), 
+  spe_EC_neun_ruv_post <- geomxBatchCorrection(spe_EC_neun, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                NCGs = metadata(spe_EC_neun)$NCGs, k = i)
+  print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Neuronal, title = paste0("k = ", i))+scale_fill_viridis_c())
+  
   
 }
 
 for(i in seq(5)){
-  spe_EC_rest_ruv_post <- geomxBatchCorrection(spe_EC_rest, factors = c("Group"), 
+  spe_EC_rest_ruv_post <- geomxBatchCorrection(spe_EC_rest, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                NCGs = metadata(spe_EC_rest)$NCGs, k = i)
   
   print(plotPairPCA(spe_EC_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
@@ -500,10 +507,10 @@ library(edgeR)
 library(limma)
 
 
-dge <- SE2DGEList(spe_EC_neun_ruv_post)
+dge <- SE2DGEList(spe_EC_rest_ruv_post)
 
 
-design <- model.matrix(~0 + Group + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_EC_neun_ruv_post))
+design <- model.matrix(~0 + Group + Astro + Oligo + Immune_Vascular + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_EC_rest_ruv_post))
 
 #table(colData(spe_ruv)$population,colData(spe_ruv)$grossRegion)
 
@@ -534,14 +541,14 @@ text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,
 
 v <- voom(dge, design)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
 
-v <- voom(dge, design,block = colData(spe_EC_neun_ruv_post)$Histology.no., correlation =
+v <- voom(dge, design,block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
             corfit$consensus)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
 
-fit <- lmFit(v, design, block = colData(spe_EC_neun_ruv_post)$Histology.no., correlation =
+fit <- lmFit(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
                corfit$consensus)
 
 fit2 <- contrasts.fit(fit, contr.matrix)
@@ -553,26 +560,51 @@ summary_fit2 <- summary(results_fit2)
 
 summary_fit2
 
-library(ggrepel)
-library(tidyverse)
 
-de_genes_toptable <- topTable(fit2, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+saveRDS(fit2, file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
 
-de_results <- topTable(fit2, coef = 1, sort.by = "P", n = Inf)
-# there is no difference between these two objects, but ill keep both.
-de_results %>% 
+
+fit2_CA1_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_neun.Rdata")
+fit2_EC_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_neun.Rdata")
+fit2_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_rest.Rdata")
+fit2_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
+
+
+de_genes_toptable_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+
+de_results_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "P", n = Inf)
+de_results_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "P", n = Inf)
+de_results_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "P", n = Inf)
+de_results_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "P", n = Inf)
+
+
+geneIndex <- rownames(de_results_CA1_rest[which(de_results_CA1_rest$adj.P.Val < 0.05 & de_results_CA1_rest$P.Value < 0.05 &  abs(de_results_CA1_rest$logFC) > 0.5),])
+
+
+plot(de_results_CA1_rest[geneIndex,"logFC"],de_results_EC_rest[geneIndex,"logFC"]) 
+text(de_results_CA1_rest[geneIndex, "logFC"], de_results_EC_rest[geneIndex, "logFC"], 
+     labels = geneIndex,
+     pos = 4, cex = 0.8, col = "red")
+abline(h= 0)
+abline(v= 0)
+
+
+de_results_EC_rest %>% 
   mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
                      ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
-  ggplot(aes(AveExpr, logFC, col = DE)) + 
+  ggplot(aes(logFC, -log10(P.Value), col = DE)) + 
   geom_point(shape = 1, size = 1) + 
-  geom_text_repel(data = de_genes_toptable %>% 
+  geom_text_repel(data = de_genes_toptable_EC_rest %>% 
                     mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
                                        ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
                     rownames_to_column(), aes(label = rowname)) +
   theme_bw() +
-  xlab("Average log-expression") +
-  ylab("Log-fold-change") +
-  ggtitle("WW v CC (spe_CA1_rest_ruv_post)") +
+  xlab("Log-fold-change") +
+  ylab("-log10 P value") +
+  ggtitle("WW v CC (spe_EC_rest_ruv_post)") +
   scale_color_manual(values = c("blue","gray","red")) +
   theme(text = element_text(size=15))
 
@@ -582,9 +614,13 @@ updn_cols <- c(RColorBrewer::brewer.pal(6, 'Greens')[2], RColorBrewer::brewer.pa
 
 de_genes_toptable %>% 
   dplyr::select(c("logFC", "AveExpr", "P.Value", "adj.P.Val")) %>%
-  DT::datatable(caption = ' WW v CC (limma-voom) spe_EC_neun_ruv_post') %>%
+  DT::datatable(caption = ' WW v CC (limma-voom) spe_CA1_neun_ruv_post') %>%
   DT::formatStyle('logFC',
                   valueColumns = 'logFC',
                   backgroundColor = DT::styleInterval(0, rev(updn_cols))) %>%
   DT::formatSignif(1:4, digits = 4)
+
+
+######################
+
 
