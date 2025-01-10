@@ -19,14 +19,14 @@ library(ggrepel)
 
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
-countData <- read.csv("preProcessedCountData_filtered.csv",header = T,)
+countDataa <- read.csv("preProcessedCountData_filtered.csv",header = T,)
 pathology <- read.csv("PathologyPG5.csv", header = T,)
 rownames(pathology) <- pathology$Histology.no.
 rownames(metaData) <- metaData$SegmentDisplayName
-colnames(countData)[14:108] <- gsub("X","",colnames(countData)[14:108])
+colnames(countDataa)[14:108] <- gsub("X","",colnames(countDataa)[14:108])
 
 duplicates <- c("D830030K20Rik", "Gm10406", "LOC118568634")
-subCountData <- countData[-which(countData$TargetName %in% duplicates),]  
+subCountData <- countDataa[-which(countDataa$TargetName %in% duplicates),]  
 rownames(subCountData) <- subCountData$ProbeDisplayName
 
 spe <- readGeoMx(countFile = subCountData[,c(4,14:108)],sampleAnnoFile = metaData,
@@ -34,7 +34,7 @@ spe <- readGeoMx(countFile = subCountData[,c(4,14:108)],sampleAnnoFile = metaDat
 
 # general:
 head(metaData)[, 1:5]
-head(countData)[,1:5]
+head(countDataa)[,1:5]
 head(pathology)[,1:5]
 
 assayNames(spe)
@@ -282,7 +282,7 @@ library(SpatialDecon)
 norm <- assay(spe_cpm)
 
 duplicates <- c("D830030K20Rik", "Gm10406", "LOC118568634")
-subCountData <- countData[-which(countData$TargetName %in% duplicates),]  
+subCountData <- countDataa[-which(countDataa$TargetName %in% duplicates),]  
 rownames(subCountData) <- subCountData$ProbeDisplayName
 
 norm <- rbind(norm,subCountData[grep("NegProbe",subCountData$TargetName),14:108])
@@ -296,7 +296,7 @@ mousebrain <- download_profile_matrix(species = "Mouse",
                                       age_group = "Adult", 
                                       matrixname = "Brain_AllenBrainAtlas")
 
-mousebrain2 <- download_profile_matrix(species = "Mouse",
+#mousebrain2 <- download_profile_matrix(species = "Mouse",
                                        age_group = "Adult", 
                                        matrixname = "Brain_MCA")
 
@@ -310,7 +310,7 @@ res <- spatialdecon(norm = norm,
                     X = mousebrain,
                     align_genes = TRUE)
 
-res2 <- spatialdecon(norm = norm,
+#res2 <- spatialdecon(norm = norm,
                     bg = bg2,
                     X = mousebrain2,
                     align_genes = TRUE)
@@ -507,10 +507,10 @@ library(edgeR)
 library(limma)
 
 
-dge <- SE2DGEList(spe_EC_rest_ruv_post)
+dge <- SE2DGEList(spe_CA1_rest_ruv_post)
 
 
-design <- model.matrix(~0 + Group + Astro + Oligo + Immune_Vascular + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_EC_rest_ruv_post))
+design <- model.matrix(~0 + Group + Astro + Oligo + Immune_Vascular + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_CA1_rest_ruv_post))
 
 #table(colData(spe_ruv)$population,colData(spe_ruv)$grossRegion)
 
@@ -541,27 +541,22 @@ text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,
 
 v <- voom(dge, design)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no.)
 
-v <- voom(dge, design,block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
+v <- voom(dge, design,block = colData(spe_CA1_rest_ruv_post)$Histology.no., correlation =
             corfit$consensus)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no.)
 
-fit <- lmFit(v, design, block = colData(spe_EC_rest_ruv_post)$Histology.no., correlation =
+fit <- lmFit(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no., correlation =
                corfit$consensus)
 
 fit2 <- contrasts.fit(fit, contr.matrix)
 
 fit2 <- eBayes(fit2)
 
-results_fit2<- decideTests(fit2)
-summary_fit2 <- summary(results_fit2)
 
-summary_fit2
-
-
-saveRDS(fit2, file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
+saveRDS(fit2, file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_rest.Rdata")
 
 
 fit2_CA1_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_neun.Rdata")
@@ -569,11 +564,21 @@ fit2_EC_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_ne
 fit2_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_rest.Rdata")
 fit2_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
 
+results_fit2_CA1rest<- decideTests(fit2_CA1_rest)
+summary_fit2_CA1rest <- summary(results_fit2_CA1rest)
 
-de_genes_toptable_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
-de_genes_toptable_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+summary_fit2_CA1rest
+
+results_fit2_ECrest <- decideTests(fit2_EC_rest)
+summary_fit2_ECrest <- summary(results_fit2_ECrest)
+
+summary_fit2_ECrest
+
+
+de_genes_toptable_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
 de_genes_toptable_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
-de_genes_toptable_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
 
 de_results_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "P", n = Inf)
 de_results_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "P", n = Inf)
@@ -581,15 +586,48 @@ de_results_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "P", n = Inf)
 de_results_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "P", n = Inf)
 
 
-geneIndex <- rownames(de_results_CA1_rest[which(de_results_CA1_rest$adj.P.Val < 0.05 & de_results_CA1_rest$P.Value < 0.05 &  abs(de_results_CA1_rest$logFC) > 0.5),])
+geneIndex <- rownames(de_results_CA1[which(de_results_CA1$adj.P.Val < 0.05 & de_results_CA1$P.Value < 0.05 &  abs(de_results_CA1$logFC) > 0.5),])
+geneIndex2 <- rownames(de_results_EC_rest[which(de_results_EC_rest$adj.P.Val < 0.05 & de_results_EC_rest$P.Value < 0.05 &  abs(de_results_EC_rest$logFC) > 0.5),])
 
 
-plot(de_results_CA1_rest[geneIndex,"logFC"],de_results_EC_rest[geneIndex,"logFC"]) 
-text(de_results_CA1_rest[geneIndex, "logFC"], de_results_EC_rest[geneIndex, "logFC"], 
+plot(de_results_CA1[geneIndex,"logFC"],de_results_EC[geneIndex,"logFC"]) 
+text(de_results_CA1[geneIndex, "logFC"], de_results_EC[geneIndex, "logFC"], 
      labels = geneIndex,
      pos = 4, cex = 0.8, col = "red")
 abline(h= 0)
 abline(v= 0)
+
+cor.test(de_results_CA1[geneIndex,"logFC"],de_results_CA1_rest[geneIndex,"logFC"])
+binom.test(146+80,nrow(de_results_CA1[geneIndex,]))
+table(sign(de_results_CA1[geneIndex,"logFC"]),sign(de_results_CA1_rest[geneIndex,"logFC"]))
+
+cor.test(de_results_CA1[geneIndex,"logFC"],de_results_EC[geneIndex,"logFC"])
+binom.test(114+78,nrow(de_results_CA1[geneIndex,]))
+table(sign(de_results_CA1[geneIndex,"logFC"]),sign(de_results_EC[geneIndex,"logFC"]))
+
+cor.test(de_results_EC[geneIndex,"logFC"],de_results_EC_rest[geneIndex,"logFC"])
+binom.test(99+85,nrow(de_results_EC[geneIndex,]))
+table(sign(de_results_EC[geneIndex,"logFC"]),sign(de_results_EC_rest[geneIndex,"logFC"]))
+
+cor.test(de_results_CA1_rest[geneIndex,"logFC"],de_results_EC_rest[geneIndex,"logFC"])
+binom.test(112+68,nrow(de_results_CA1_rest[geneIndex,]))
+table(sign(de_results_CA1_rest[geneIndex,"logFC"]),sign(de_results_EC_rest[geneIndex,"logFC"]))
+
+
+gh <- data.frame(de_results_CA1[geneIndex,"logFC"],
+                 de_results_EC[geneIndex,"logFC"],
+                 row.names = rownames(geneIndex))
+
+hj <- data.frame(geneIndex, rowSums(abs(gh)))
+ll <- data.frame(geneIndex, rowSums(gh))
+
+
+hj <- dplyr::arrange(hj, desc(rowSums.abs.gh..))
+ll <- dplyr::arrange(ll, desc(rowSums.gh.))
+
+
+hj[1:20,]
+ll[c(1:10, 283:292),]
 
 
 de_results_EC_rest %>% 
@@ -612,15 +650,51 @@ library(DT)
 
 updn_cols <- c(RColorBrewer::brewer.pal(6, 'Greens')[2], RColorBrewer::brewer.pal(6, 'Purples')[2])
 
-de_genes_toptable %>% 
+de_genes_toptable_CA1 %>% 
   dplyr::select(c("logFC", "AveExpr", "P.Value", "adj.P.Val")) %>%
-  DT::datatable(caption = ' WW v CC (limma-voom) spe_CA1_neun_ruv_post') %>%
+  DT::datatable(caption = ' WW v CC de_genes_toptable_CA1') %>%
   DT::formatStyle('logFC',
                   valueColumns = 'logFC',
                   backgroundColor = DT::styleInterval(0, rev(updn_cols))) %>%
   DT::formatSignif(1:4, digits = 4)
 
-
+de_genes_toptable_EC %>% 
+  dplyr::select(c("logFC", "AveExpr", "P.Value", "adj.P.Val")) %>%
+  DT::datatable(caption = ' WW v CC de_genes_toptable_EC') %>%
+  DT::formatStyle('logFC',
+                  valueColumns = 'logFC',
+                  backgroundColor = DT::styleInterval(0, rev(updn_cols))) %>%
+  DT::formatSignif(1:4, digits = 4)
 ######################
 
+de_results_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "P", n = Inf)
+de_results_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "P", n = Inf)
 
+colnames(de_results_CA1) <- paste(colnames(de_results_CA1), "CA1",sep = "_")
+CA1_EC <- cbind(de_results_CA1, de_results_EC[rownames(de_results_CA1), ])
+sign(CA1_EC$logFC)  == sign(CA1_EC$logFC_CA1)
+
+CA1_EC$sign <- sign(CA1_EC$logFC)  == sign(CA1_EC$logFC_CA1)
+
+sig_FDR <- CA1_EC[which(CA1_EC$adj.P.Val_CA1 < 0.05 & abs(CA1_EC$logFC_CA1) > 0.5),]
+
+artifacts <- c("Wdr60", "Esyt2", "Ncapg2", "Ptprn2", "Fgf14")
+ff<- CA1_EC[which(CA1_EC$adj.P.Val_CA1 < 0.05 & abs(CA1_EC$logFC_CA1) > 0.5 & CA1_EC$adj.P.Val < 0.05 & abs(CA1_EC$logFC) > 0.5),]
+
+sig_FDR <- sig_FDR[which(sig_FDR$sign == TRUE),]
+
+ff %>% 
+  mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
+                     ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
+  ggplot(aes(logFC, -log10(P.Value), col = DE)) + 
+  geom_point(shape = 1, size = 1) + 
+  geom_text_repel(data = ff %>% 
+                    mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
+                                       ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
+                    rownames_to_column(), aes(label = rowname)) +
+  theme_bw() +
+  xlab("Log-fold-change") +
+  ylab("-log10 P value") +
+  ggtitle("significant genes") +
+  scale_color_manual(values = c("blue","gray","red")) +
+  theme(text = element_text(size=15))
