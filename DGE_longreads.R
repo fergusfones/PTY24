@@ -31,6 +31,7 @@ library(grid)
 library(glue)
 library(dplyr)
 library(edgeR)
+library(reshape2)
 
 identical(long_reads$NeuN65_mapped, long_reads$NeuN65._mapped)
 
@@ -78,41 +79,19 @@ dds <- DESeqDataSetFromMatrix(countData = cts,
                               design= ~group)
 
 
+##############################
 
+Gfapp <- NULL
+Gfapp <- cts_normalised_log["Gfap", ]
 
+data.frame(Gfapp)
 
-# have no idea what i was trying here
-##p <- cbind(reshape2::melt(sizeFactors(dds)), reshape2::melt(colSums(counts(dds)))) %>% 
-  `colnames<-`(c("sizefactors", "nreads")) %>% 
-  tibble::rownames_to_column("sample") %>% 
-  mutate(sample = str_remove(sample,"ont_")) %>%
-  ggplot(., aes(x = sizefactors, y = nreads)) + geom_point() +
-  geom_label_repel(aes(label = sample), box.padding   = 0.35, point.padding = 0.5, segment.color = 'grey50') +
-  theme_bw() + labs(y = "Number of reads", x = "Size Factors")
-p  
-
-
-# rlog is the recommended method for experiments with n<20
-# normalization to stabilize variance (regularized logarithm)
-rld <- rlog(dds, blind = FALSE)
-
-
-
-
-
-ggplot(dds,
-       aes(x = group, y =counts(dds) , fill = group) +
-         geom_bar(stat = "identity", position = "dodge") +
-         labs(
-         x = "Age and Group",
-         y = "Sample Number (n)",
-         title = "Overview of the Dataframe") +
-         theme_minimal() +
-         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-         scale_fill_manual(values = c("Tg" = "skyblue", "WT" = "orange")))
-
-
-
+Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
+  facet_grid(~age)
 
 
 
@@ -178,7 +157,6 @@ excluded
 
 long_reads<- read.delim("/Users/fergusfones/Desktop/Nanostring/rTg4510SCN_collapsed_RulesFilter_result_classification_counts.txt")
 phenotypes <- read.csv("/Users/fergusfones/Desktop/Nanostring/SCNPhenotype.csv")
-
 
 
 Gfap <- long_reads[long_reads$associated_gene == "Gfap",] %>%
