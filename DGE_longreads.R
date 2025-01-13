@@ -17,6 +17,9 @@ if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
 BiocManager::install("DESeq2")
+
+BiocManager::install("Gmisc")
+
 library(DESeq2)
 library(tibble)
 library(tidyr)
@@ -27,74 +30,59 @@ library(Gmisc, quietly = TRUE)
 library(grid)
 library(glue)
 library(dplyr)
-
-BiocManager::install("Gmisc")
-
+library(edgeR)
 
 identical(long_reads$NeuN65_mapped, long_reads$NeuN65._mapped)
 
 long_reads <- long_reads[ -69]
 
+# sum the counts of transcript by genes
 cts <- long_reads %>%
   group_by(associated_gene) %>%
   summarise((across(58:72, sum, na.rm = TRUE)))
 
-# sum the counts of transcript by genes
+(unique(long_reads$associated_gene))
+# looks like the genes have been summed right
 
-pivot_wider(names_from = associated_gene, values_from = )
+#put the genes into the rows
 
-rownames(cts) <- cts$associated_gene
+cts <- tibble::column_to_rownames(cts, var = "associated_gene")
 
-tibble::column_to_rownames(cts, var = associated_gene)
+# subset Neun
+cts <- cts[, c( "NeuN15_mapped", "NeuN19_mapped" ,"NeuN3_mapped" ,"NeuN65_mapped" ,"NeuN69_mapped" ,"NeuN72_mapped" ,"NeuN77_mapped", "NeuN7_mapped")]
 
-#cts[duplicated(cts[, 1]), ]
 
-coldata <- long_reads[,7]
-batch <- phenotypes$age
+#subset Neun in colData
+phenotypes <- phenotypes[9:16,]
 
-condition <- phenotypes$group
+# making the DEseqDataset object, i think its like a summarised experiment object...
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = phenotypes,
+                              design= ~group)
 
-rownames(phenotypes) <- phenotypes$sample
-phenotypes$group <- as.factor(phenotypes$group)
-phenotypes$age <- as.factor(phenotypes$age)
+keep <- rowSums(counts(dds)) >= 20
+# upped the threshold to 20
 
-# subset the NeuN
+dds <- dds[keep,]
+
+
+DE_dds <- DESeq(dds)
+#Error in estimateSizeFactorsForMatrix(counts(object), locfunc = locfunc,  : every gene contains at least one zero, cannot compute log geometric means
+# could add 1 to all counts, however this will reduce effect size of counts that are small...
+
+cts_normalised <- edgeR::cpm(cts)
+cts_normalised_log <- edgeR::cpm(cts, log = TRUE)
 
 dds <- DESeqDataSetFromMatrix(countData = cts,
                               colData = phenotypes,
                               design= ~group)
 
 
-keep <- rowSums(counts(dds)) >= 10
-# up the threshold 
-
-dds <- dds[keep,]
-
-
-DESeq(dds)
-#dds$group <- relevel(dds$group, ref = "WT")
-# dont think this is working
-
-#rld <- rlog(dds, blind = FALSE)
-#head(assay(rld), 3)
-
-cat("No of isoforms before filtering:", nrow(dds),"\n")
-dds <- dds[rowSums(counts(dds)) > 4, ]
-cat("No of isoforms after filtering:", nrow(dds),"\n")
 
 
 
-# Extract raw counts
-raw_counts <- counts(dds)
-
-# Calculate library sizes (total counts per sample)
-library_sizes <- colSums(raw_counts)
-
-# Calculate CPM
-cpm <- t(t(raw_counts) / library_sizes) * 1e6
-log_cpm <- log2(cpm + 1)
-
-p <- cbind(reshape2::melt(sizeFactors(dds)), reshape2::melt(colSums(counts(dds)))) %>% 
+# have no idea what i was trying here
+##p <- cbind(reshape2::melt(sizeFactors(dds)), reshape2::melt(colSums(counts(dds)))) %>% 
   `colnames<-`(c("sizefactors", "nreads")) %>% 
   tibble::rownames_to_column("sample") %>% 
   mutate(sample = str_remove(sample,"ont_")) %>%
@@ -103,26 +91,29 @@ p <- cbind(reshape2::melt(sizeFactors(dds)), reshape2::melt(colSums(counts(dds))
   theme_bw() + labs(y = "Number of reads", x = "Size Factors")
 p  
 
+
+# rlog is the recommended method for experiments with n<20
 # normalization to stabilize variance (regularized logarithm)
 rld <- rlog(dds, blind = FALSE)
 
 
 
-melt(phenotypes[,c("cell","sample_ID","group","age")])
 
-pheno_NeuN <- phenotypes[phenotypes$cell == "NeuN", ]
 
-#ggplot(pheno_NeuN,
-      # aes(x = age, y = , fill = group) +
+ggplot(dds,
+       aes(x = group, y =counts(dds) , fill = group) +
          geom_bar(stat = "identity", position = "dodge") +
-       labs(
+         labs(
          x = "Age and Group",
          y = "Sample Number (n)",
-         title = "Overview of the Dataframe"
-       ) +
+         title = "Overview of the Dataframe") +
          theme_minimal() +
          theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
          scale_fill_manual(values = c("Tg" = "skyblue", "WT" = "orange")))
+
+
+
+
 
 
 # trying to make a boxplot
