@@ -90,19 +90,84 @@ Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>%
   mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
   merge(., phenotypes, by = "sample") %>% 
   mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
-
-Gfapp <- data.frame(matrix(data = cts_normalised_log["Gfap", ], nrow = 1))
-colnames(Gfapp) <- phenotypes$sample
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Gfap gene expression NeuN")
 
 
-Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+
+
+Cdkn2aip <- data.frame(matrix(data = cts_normalised_log["Cdkn2aip", ], nrow = 1))
+colnames(Cdkn2aip) <- phenotypes$sample
+
+
+Cdkn2aip %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
   mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
   merge(., phenotypes, by = "sample") %>% 
   mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Cdkn2aip gene expression NeuN")
+
+
+
+Pfkm <- data.frame(matrix(data = cts_normalised_log["Pfkm", ], nrow = 1))
+colnames(Pfkm) <- phenotypes$sample
+
+
+Pfkm %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Pfkm gene expression NeuN")
+
+
+
+Fer1l6 <- data.frame(matrix(data = cts_normalised_log["Fer1l6", ], nrow = 1))
+colnames(Fer1l6) <- phenotypes$sample
+
+
+Fer1l6 %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Fer1l6 gene expression NeuN")
+
+
+
+
+Tmc5 <- data.frame(matrix(data = cts_normalised_log["Tmc5", ], nrow = 1))
+colnames(Tmc5) <- phenotypes$sample
+
+
+Tmc5 %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Fer1l6 gene expression NeuN")
+# Tmc5 looks like an artifact
+
+
+
+Trabd2b <- data.frame(matrix(data = cts_normalised_log["Trabd2b", ], nrow = 1))
+colnames(Trabd2b) <- phenotypes$sample
+
+
+Trabd2b %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads)) + geom_point(size = 3) +
+  facet_grid(~age) +
+  ggtitle("LogCPM Fer1l6 gene expression NeuN")
+
+
 
 
 # trying to make a boxplot
@@ -164,60 +229,3 @@ grps
 excluded
        
 ##################
-
-long_reads<- read.delim("/Users/fergusfones/Desktop/Nanostring/rTg4510SCN_collapsed_RulesFilter_result_classification_counts.txt")
-phenotypes <- read.csv("/Users/fergusfones/Desktop/Nanostring/SCNPhenotype.csv")
-
-
-Gfap <- long_reads[long_reads$associated_gene == "Gfap",] %>%
-  select(contains("mapped")) %>%
-  summarise(across(1:16, ~ sum(.x, na.rm = TRUE)))
-
-Gfap %>% reshape2::melt(variable.name = "sample",value.name = "reads") %>% 
-  mutate(sample_id = stringr::word(sample,c(1), sep = fixed("_"))) %>% 
-  merge(., phenotypes, by = "sample") %>% 
-  mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
-
-
-
-
-Pfkm <- long_reads[long_reads$associated_gene == "Pfkm",] %>%
-  select(contains("mapped")) %>%
-  summarise(across(1:16, ~ sum(.x, na.rm = TRUE)))
-
-Pfkm %>% reshape2::melt(variable.name = "sample",value.name = "reads") %>% 
-  mutate(sample_id = stringr::word(sample,c(1), sep = fixed("_"))) %>% 
-  merge(., phenotypes, by = "sample") %>% 
-  mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
-
-
-
-
-Cdkn2aip <- long_reads[long_reads$associated_gene == "Cdkn2aip",] %>%
-  select(contains("mapped")) %>%
-  summarise(across(1:16, ~ sum(.x, na.rm = TRUE)))
-
-Cdkn2aip %>% reshape2::melt(variable.name = "sample",value.name = "reads") %>% 
-  mutate(sample_id = stringr::word(sample,c(1), sep = fixed("_"))) %>% 
-  merge(., phenotypes, by = "sample") %>% 
-  mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
-
-
-
-Clec2j <- long_reads[long_reads$associated_gene == "Cdkn2aip",] %>%
-  select(contains("mapped")) %>%
-  summarise(across(1:16, ~ sum(.x, na.rm = TRUE)))
-
-Clec2j %>% reshape2::melt(variable.name = "sample",value.name = "reads") %>% 
-  mutate(sample_id = stringr::word(sample,c(1), sep = fixed("_"))) %>% 
-  merge(., phenotypes, by = "sample") %>% 
-  mutate(group = factor(group, levels = c("WT","TG"))) %>%
-  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
-  facet_grid(~age)
-
