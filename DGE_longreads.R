@@ -81,10 +81,10 @@ dds <- DESeqDataSetFromMatrix(countData = cts,
 
 ##############################
 
-Gfapp <- NULL
-Gfapp <- cts_normalised_log["Gfap", ]
 
-data.frame(Gfapp)
+Gfapp <- data.frame(matrix(data = cts_normalised_log["Gfap", ], nrow = 1))
+colnames(Gfapp) <- phenotypes$sample
+
 
 Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
   mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
@@ -93,6 +93,16 @@ Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>%
   ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
   facet_grid(~age)
 
+Gfapp <- data.frame(matrix(data = cts_normalised_log["Gfap", ], nrow = 1))
+colnames(Gfapp) <- phenotypes$sample
+
+
+Gfapp %>% reshape2::melt(variable.name = "sample", value.name = "reads") %>% 
+  mutate(sample_id = stringr::word("sample",c(1), sep = fixed("_"))) %>% 
+  merge(., phenotypes, by = "sample") %>% 
+  mutate(group = factor(group, levels = c("WT","TG"))) %>%
+  ggplot(., aes(x = group, y = reads, colour = cell)) + geom_point(size = 3) +
+  facet_grid(~age)
 
 
 # trying to make a boxplot
