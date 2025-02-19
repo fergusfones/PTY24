@@ -10,6 +10,7 @@ library(tidyverse)
 library(WGCNA)
 library(PerseusR)
 library(DESeq2)
+library(dplyr)
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 countDataa <- read.csv("preProcessedCountData_filtered.csv",header = T,)
@@ -34,8 +35,10 @@ WGCNA_matrix <- subCountData[,c(4,14:108)]
 WGCNA_matrix <- WGCNA_matrix %>% 
   filter(., TargetName != "NegProbe-WTX")
 
+WGCNA_matrix <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
 rownames(WGCNA_matrix) <- WGCNA_matrix[, 1]
-WGCNA_matrix <- WGCNA_matrix[, 2:96]
+WGCNA_matrix <- WGCNA_matrix[, 2:48]
 
 WGCNA_matrix <- as.matrix(WGCNA_matrix)
 
@@ -43,10 +46,13 @@ WGCNA_matrix <- as.matrix(WGCNA_matrix)
 meta_df <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 meta_df <- meta_df[, c(6, 36, 38 )]
 rownames(meta_df) <- meta_df[,1]
+meta_df <- meta_df %>%
+  filter(., population == "neun")
+  
 
 dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix),
                               meta_df,
-                              design = ~Group + population)
+                              design = ~Group)
 dds <- DESeq(dds)
 vsd <- varianceStabilizingTransformation(dds)
 # linear regression fit was substituted for a local regression fit by the function
