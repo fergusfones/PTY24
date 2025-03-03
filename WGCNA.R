@@ -52,7 +52,23 @@ WGCNA_matrix_CA1_neun <- WGCNA_matrix_CA1_neun[, 2:25]
 #WGCNA_cpm_log <- edgeR::cpm(WGCNA_matrix, log =T)
 
 
-# Normalising data with DESeq
+#
+#
+#
+#
+#
+
+#                  Normalising data with DESeq
+###
+
+##
+#
+#
+#
+#
+#
+#
+
 meta_df <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 meta_df <- meta_df[, c(6, 32, 36, 38 )]
 
@@ -150,8 +166,27 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
     x = "treatment",
     y = "cpm normalized expression"
   )
-
-# starting WGCNA
+  
+  #
+  #
+  ##
+  #
+  #
+  #
+  #
+  #
+  
+  #                    starting WGCNA
+  ###
+  
+  ##
+  #
+  #
+  #
+  #
+  #
+  #
+# 
 
 input_mat <- t(expr_normalized)
 
@@ -168,7 +203,6 @@ sft = pickSoftThreshold(
   powerVector = powers,
   verbose = 5
 )
-
 
 
 par(mfrow = c(1,2));
@@ -200,7 +234,10 @@ text(sft$fitIndices[, 1],
 
 # trying power = 8
 
-picked_power <- 9
+
+
+
+picked_power <- 8
 
 temp_cor <- cor       
 cor <- WGCNA::cor         # Force it to use WGCNA cor function (fix a namespace conflict issue)
@@ -231,6 +268,9 @@ netwk <- blockwiseModules(input_mat,                # <= input here
 
 cor <- temp_cor
 
+
+
+
 # Convert labels to colors for plotting
 mergedColors = labels2colors(netwk$colors)
 # Plot the dendrogram and the module colors underneath
@@ -245,6 +285,30 @@ plotDendroAndColors(
 
 # netwk$colors[netwk$blockGenes[[1]]]
 # table(netwk$colors)
+
+
+
+
+
+
+##
+#
+#
+#
+#
+#
+#
+#          Relate Modules assignments to treatment groups
+
+##
+#
+#
+#
+#
+#
+#
+# 
+
 
 module_df <- data.frame(
   gene_id = names(netwk$colors),
@@ -296,6 +360,27 @@ mME %>% ggplot(., aes(x=treatment, y=name, fill=value)) +
 
 
 
+
+##
+#
+#
+#
+#
+#
+#
+#          Examine expression profiles
+
+##
+#
+#
+#
+#
+#
+#
+# 
+
+
+
 # pick out a few modules of interest here
 modules_of_interest = c("grey", "yellow")
 
@@ -329,6 +414,30 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
   facet_grid(rows = vars(module)) +
   labs(x = "treatment",
        y = "normalized expression")
+
+
+
+
+##
+#
+#
+#
+#
+#
+#
+#          Generate and export networks
+
+##
+#
+#
+#
+#
+#
+#
+# 
+
+
+
 
 
 genes_of_interest = module_df %>%
