@@ -11,6 +11,9 @@ library(WGCNA)
 library(PerseusR)
 library(DESeq2)
 library(dplyr)
+library(pheatmap)
+install.packages("RColorBrewer")
+library(RColorBrewer)
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 countDataa <- read.csv("preProcessedCountData_filtered.csv",header = T,)
@@ -166,6 +169,34 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
     x = "treatment",
     y = "cpm normalized expression"
   )
+  
+  
+  #
+  #
+  ##
+  #
+  #
+  #
+  #
+  #
+  # correlation matrix
+  
+  
+  cor_matrix <-  t(expr_normalized)
+  cor_matrix <- cor(cor_matrix, method = "spearman")
+  
+  colours <- colorRampPalette(brewer.pal(9, "Blues"))(225)
+  
+  pheatmap(cor_matrix, col = colours, main = "gene expression correlation", show_colnames = F, show_rownames = F)
+  
+  #
+  #
+  ##
+  #
+  #
+  #
+  
+  
   
   #
   #
@@ -478,3 +509,4 @@ head(edge_list)
 write_delim(edge_list,
             file = "edgelist.tsv",
             delim = "\t")
+
