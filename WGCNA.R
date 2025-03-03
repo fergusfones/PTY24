@@ -70,7 +70,7 @@ WGCNA_matrix_CA1_neun <- WGCNA_matrix_CA1_neun[, 2:25]
 #
 
 meta_df <- read.csv("preProcessedMetaData_filtered.csv",header = T)
-meta_df <- meta_df[, c(6, 32, 36, 38 )]
+meta_df <- meta_df[, c(6, 32, 35, 36, 38 )]
 
 #meta_df$age <- pathology$Month[pathology$Histology.no. %in% c("16/085", "16/095", "16/093", "16/083", "16/082", "16/092", "16/081", "16/099")]
 
@@ -338,15 +338,21 @@ module_order = names(MEs0) %>% gsub("ME","", .)
 # Add treatment names
 MEs0$treatment = row.names(MEs0)
 
+
+# Adding other variables
+MEs0 <- cbind(MEs0, meta_df)
+#MEs0 <- left_join(MEs0, meta_df, by = "treatment")
+
 # tidy & plot data
 mME = MEs0 %>%
-  pivot_longer(-treatment) %>%
+  select(- c("SegmentDisplayName", "Histology.no.", "Group", "grossRegion", "treatment")) %>%
+  pivot_longer(cols = -population) %>%
   mutate(
     name = gsub("ME", "", name),
     name = factor(name, levels = module_order)
   )
 
-mME %>% ggplot(., aes(x=treatment, y=name, fill=value)) +
+mME %>% ggplot(., aes(x= population, y=name, fill=value)) +
   geom_tile() +
   theme_bw() +
   scale_fill_gradient2(
