@@ -47,7 +47,15 @@ WGCNA_matrix <- as.matrix(WGCNA_matrix)
 dim(WGCNA_matrix)
 
 WGCNA_matrix_CA1_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
-WGCNA_matrix_CA1_neun <- WGCNA_matrix_CA1_neun[, 2:25]
+
+
+WGCNA_matrix_CA1_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
+
+WGCNA_matrix_EC_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
+
+WGCNA_matrix_EC_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
 
 
 # Normalisation of matrix via cpm
@@ -189,6 +197,14 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   
   pheatmap(cor_matrix, col = colours, main = "gene expression correlation", show_colnames = F, show_rownames = F)
   
+  
+  
+  # hierarchical clustering 
+  
+htree <- hclust(dist(t(expr_normalized)))
+plot(htree, xlab = "samples", main = "hierarchical clustering ")
+
+
   #
   #
   ##
@@ -382,6 +398,72 @@ mME = MEs0 %>%
     name = gsub("ME", "", name),
     name = factor(name, levels = module_order)
   )
+
+
+
+
+
+### Calculate correlation between traits and modules
+
+MEs0 <- MEs0[,-which(colnames(MEs0)=="MEgrey")]
+traits <- meta_df[,3:5]
+
+#encoding traits
+traits_numeric <- as.data.frame(lapply(traits, function(x) {
+  if (is.factor(x) || is.character(x)) {
+    as.numeric(as.factor(x))  # Converts factor levels to numbers
+  } else {
+    x  # Keep numeric columns as they are
+  }
+}))
+
+
+moduleTraitCor = stats::cor(MEs0[,1:4],traits_numeric , use = "p");
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
+
+
+png(paste0(path, title), width = 3000, height = 2000, res = 300)  # Increase resolution and dimensions
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(", signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+
+# Adjust margins and font sizes
+par(mar = c(10, 10, 5, 5), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decrease margins and adjust font sizes
+
+# Plot the heatmap
+
+#pheatmap(moduleTraitCor, col = colours, main = "module trait correlation")
+
+
+labeledHeatmap(
+  Matrix = moduleTraitCor,
+  xLabels = colnames(traits_numeric),
+  yLabels = names(MEs0[1:4]),
+  ySymbols = names(MEs0[1:4]),
+  colorLabels = FALSE,
+  colors = colorRampPalette(c("blue", "white", "red"))(50),  # Change color scheme if needed
+  textMatrix = textMatrix,
+  setStdMargins = TRUE,
+  plotLegend = TRUE,
+  cex.text = 0.7,  # Reduce label size
+  zlim = c(-1, 1),
+  main = "Module-trait relationships"
+)
+
+
+
+
+
+
+MEs0 %>%
+  select(- c("SegmentDisplayName", "Histology.no.", "Group", "grossRegion", "treatment")) %>%
+  pivot_longer(cols = -population) %>%
+  mutate(
+    name = gsub("ME", "", name),
+    name = factor(name, levels = module_order)
+  )
+
+
+
 
 mME %>% ggplot(., aes(x= population, y=name, fill=value)) +
   geom_tile() +
