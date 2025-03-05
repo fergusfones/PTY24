@@ -89,14 +89,27 @@ meta_df <- meta_df[, c(6, 32, 35, 36, 38 )]
 rownames(meta_df) <- meta_df[,1]
 
 # sorting for CA1 neun
-meta_df <- meta_df %>%
+meta_df_CA1_neun <- meta_df %>%
   filter(., population == "neun" & grepl("CA1", rownames(meta_df)))
   
+# sorting for CA1 rest
+meta_df_CA1_rest <- meta_df %>%
+  filter(., population == "rest" & grepl("CA1", rownames(meta_df)))
 
-dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix),
-                              meta_df,
+# sorting for EC neun
+meta_df_EC_neun <- meta_df %>%
+  filter(., population == "neun" & grepl("EC", rownames(meta_df)))
+
+# sorting for EC rest
+meta_df_EC_rest <- meta_df %>%
+  filter(., population == "rest" & grepl("EC", rownames(meta_df)))
+
+
+dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix_CA1_neun),
+                              meta_df_CA1_neun,
                               design = ~Group)
 dds <- DESeq(dds)
+
 # DEseq pipeline ends
 
 
@@ -152,7 +165,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   ) +
   ylim(0, NA) +
   labs(
-    title = "Normalized and 95 quantile Expression",
+    title = "Normalized and 95 quantile Expression_CA1_neun",
     x = "treatment",
     y = "normalized expression"
   )
@@ -282,9 +295,7 @@ text(sft$fitIndices[, 1],
 # trying power = 8
 
 
-
-
-picked_power <- 8
+picked_power <- 6
 
 temp_cor <- cor       
 cor <- WGCNA::cor         # Force it to use WGCNA cor function (fix a namespace conflict issue)
@@ -387,36 +398,19 @@ MEs0$treatment = row.names(MEs0)
 
 
 # Adding other variables
-MEs0 <- cbind(MEs0, meta_df)
+MEs0 <- cbind(MEs0, meta_df_CA1_neun)
 #MEs0 <- left_join(MEs0, meta_df, by = "treatment")
-
-# tidy & plot data
-mME = MEs0 %>%
-  select(- c("SegmentDisplayName", "Histology.no.", "Group", "grossRegion", "treatment")) %>%
-  pivot_longer(cols = -population) %>%
-  mutate(
-    name = gsub("ME", "", name),
-    name = factor(name, levels = module_order)
-  )
-
-
-
 
 
 ### Calculate correlation between traits and modules
 
 MEs0 <- MEs0[,-which(colnames(MEs0)=="MEgrey")]
-traits <- meta_df[,3:5]
+
+traits <- meta_df_CA1_neun %>%
+  select(- c("SegmentDisplayName", "Histology.no.", "population", "grossRegion"))
 
 #encoding traits
-traits_numeric <- as.data.frame(lapply(traits, function(x) {
-  if (is.factor(x) || is.character(x)) {
-    as.numeric(as.factor(x))  # Converts factor levels to numbers
-  } else {
-    x  # Keep numeric columns as they are
-  }
-}))
-
+traits_numeric <- ifelse(traits == "WW", 0 ,1) 
 
 moduleTraitCor = stats::cor(MEs0[,1:4],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
@@ -449,23 +443,17 @@ labeledHeatmap(
   main = "Module-trait relationships"
 )
 
-
-
-
-
-
-MEs0 %>%
-  select(- c("SegmentDisplayName", "Histology.no.", "Group", "grossRegion", "treatment")) %>%
-  pivot_longer(cols = -population) %>%
+# tidy & plot data
+mME = MEs0 %>%
+  select(- c("SegmentDisplayName", "Histology.no.", "population", "grossRegion", "treatment")) %>%
+  pivot_longer(cols = -Group) %>%
   mutate(
     name = gsub("ME", "", name),
     name = factor(name, levels = module_order)
   )
 
 
-
-
-mME %>% ggplot(., aes(x= population, y=name, fill=value)) +
+mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
   geom_tile() +
   theme_bw() +
   scale_fill_gradient2(
@@ -475,7 +463,7 @@ mME %>% ggplot(., aes(x= population, y=name, fill=value)) +
     midpoint = 0,
     limit = c(-1,1)) +
   theme(axis.text.x = element_text(angle=90)) +
-  labs(title = "Module-trait Relationships", y = "Modules", fill="corr")
+  labs(title = "Module-trait Relationships_CA1_neun", y = "Modules", fill="corr")
 
 
 
