@@ -1,6 +1,12 @@
+# The code performs a WGCNA analysis
+# 
+# Made using this tutorial : https://bioinformaticsworkbook.org/tutorials/wgcna.html#gsc.tab=0
+# And with help from Giulia Pegoraro, University of Exeter Medical School
+
+###########################################
 setwd("/Users/fergusfones/Desktop/Nanostring/")
 getwd()
-# WGCNA
+
 
 install.packages("BiocManager")
 BiocManager::install(c("WGCNA", "devtools"))
@@ -14,6 +20,11 @@ library(dplyr)
 library(pheatmap)
 install.packages("RColorBrewer")
 library(RColorBrewer)
+
+
+###########################################
+
+
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 countDataa <- read.csv("preProcessedCountData_filtered.csv",header = T,)
@@ -29,7 +40,6 @@ rownames(subCountData) <- subCountData$ProbeDisplayName
 
 
 # do i have to control for covariates like cell types and correct the data like we did in the GeoMX workflow?
-# Currently just using CA1 neun samples, current n=24
 
 
 # need to transpose data, so gene probes are in the columns and 'treatments' are in the rows, in a count matrix
@@ -45,23 +55,7 @@ WGCNA_matrix <- WGCNA_matrix[, 2:96]
 WGCNA_matrix <- as.matrix(WGCNA_matrix)
 
 dim(WGCNA_matrix)
-
-WGCNA_matrix_CA1_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
-
-
-WGCNA_matrix_CA1_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
-
-
-WGCNA_matrix_EC_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
-
-
-WGCNA_matrix_EC_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
-
-
-# Normalisation of matrix via cpm
-#WGCNA_cpm <- edgeR::cpm(WGCNA_matrix)
-#WGCNA_cpm_log <- edgeR::cpm(WGCNA_matrix, log =T)
-
+# 19959, 95
 
 #
 #
@@ -105,31 +99,24 @@ meta_df_EC_rest <- meta_df %>%
   filter(., population == "rest" & grepl("EC", rownames(meta_df)))
 
 
-dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix_CA1_neun),
-                              meta_df_CA1_neun,
+dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix),
+                              meta_df,
                               design = ~Group)
 dds <- DESeq(dds)
 
 # DEseq pipeline ends
 
 
-
-#vsd_cpm <- varianceStabilizingTransformation(WGCNA_cpm)
-# values are not integers
-
 vsd <- varianceStabilizingTransformation(dds)
-# what is this doing in the script?
+# retains metadata, can be used for PCA, visualisation, further processing
 # linear regression fit was substituted for a local regression fit by the function
 
 
 
 wpn_vsd <- getVarianceStabilizedData(dds)
 
-#wpn_vsd_cpm <- getVarianceStabilizedData(WGCNA_cpm)
-#unable to find an inherited method for function ‘dispersionFunction’ for signature ‘object = "matrix"’
 
 rv_wpn <- rowVars(wpn_vsd) 
-#rv_cpm <- rowVars(WGCNA_cpm)
 summary(rv_wpn)
 
 q75_wpn <- quantile( rowVars(wpn_vsd), .75)  # <= original
@@ -137,22 +124,45 @@ q5_wpn <- quantile( rowVars(wpn_vsd), .5)
 q95_wpn <- quantile( rowVars(wpn_vsd), .95)  # <= 95 quantile reduces dataset
 expr_normalized <- wpn_vsd[ rv_wpn > q95_wpn, ]
 dim(expr_normalized)
-# normalised expression obj showing 998 genes with 95q, and 4990 with 75q
-# sometimes shows 1009??
+# whole normalised expression obj showing 998 genes with 95q, and 4990 with 75q
 
-#for cpm
-#q75_cpm <- quantile( rowVars(WGCNA_cpm), .75)  # <= original
-#q5_cpm <- quantile( rowVars(WGCNA_cpm), .5) 
-#q95_cpm <- quantile( rowVars(WGCNA_cpm), .95)  # <= 95 quantile reduces dataset
-#expr_normalized_cpm <- WGCNA_cpm[ rv_cpm > q75_cpm, ]
-#dim(expr_normalized_cpm)
-# same dim as dds above
 
-#expr_normalized_cpm_log <- log(expr_normalized_cpm)
 
-expr_normalized_df <- data.frame(expr_normalized) %>%
+#
+#
+#
+#
+#
+#
+#
+#
+# Subset after normalisation
+#
+#
+#
+#
+#
+#
+#
+
+expr_normalized_CA1_neun <- expr_normalized[, grepl("neun", colnames(expr_normalized)) & !grepl("rest", colnames(expr_normalized)) & grepl("CA1", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
+
+
+expr_normalized_CA1_rest <- expr_normalized[, grepl("rest", colnames(expr_normalized)) & !grepl("neun", colnames(expr_normalized)) & grepl("CA1", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
+
+
+expr_normalized_EC_neun <- expr_normalized[, grepl("neun", colnames(expr_normalized)) & !grepl("rest", colnames(expr_normalized)) & grepl("EC", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
+
+
+expr_normalized_EC_rest <- expr_normalized[, grepl("rest", colnames(expr_normalized)) & !grepl("neun", colnames(expr_normalized)) & grepl("EC", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
+
+
+
+
+
+expr_normalized_df <- data.frame(expr_normalized_CA1_neun) %>%
   mutate(
-    Gene_id = row.names(expr_normalized)
+    Gene_id = row.names(expr_normalized_CA1_neun)
   ) %>%
   pivot_longer(-Gene_id)
 
@@ -165,31 +175,12 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   ) +
   ylim(0, NA) +
   labs(
-    title = "Normalized and 95 quantile Expression_CA1_neun",
+    title = "Normalized and 95 quantile Expression_CA1_neun__ subset after normalisation",
     x = "treatment",
     y = "normalized expression"
   )
 
-# for cpm
-#expr_normalized_cpm_log_df <- data.frame(expr_normalized_cpm_log) %>%
-  mutate(
-    Gene_id = row.names(expr_normalized_cpm_log)
-  ) %>%
-  pivot_longer(-Gene_id)
 
-#expr_normalized_cpm_log_df %>% ggplot(., aes(x = name, y = value)) +
-  geom_violin() +
-  geom_point() +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text( angle = 90)
-  ) +
-  ylim(0, NA) +
-  labs(
-    title = "cpm Normalized",
-    x = "treatment",
-    y = "cpm normalized expression"
-  )
   
   
   #
@@ -203,7 +194,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   # correlation matrix
   
   
-  cor_matrix <-  t(expr_normalized)
+  cor_matrix <-  t(expr_normalized_CA1_neun)
   cor_matrix <- cor(cor_matrix, method = "spearman")
   
   colours <- colorRampPalette(brewer.pal(9, "Blues"))(225)
@@ -214,7 +205,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   
   # hierarchical clustering 
   
-htree <- hclust(dist(t(expr_normalized)))
+htree <- hclust(dist(t(expr_normalized_CA1_neun)))
 plot(htree, xlab = "samples", main = "hierarchical clustering ")
 
 
@@ -248,7 +239,7 @@ plot(htree, xlab = "samples", main = "hierarchical clustering ")
   #
 # 
 
-input_mat <- t(expr_normalized)
+input_mat <- t(expr_normalized_CA1_neun)
 
 # Allowing multi-threading
 allowWGCNAThreads() 
@@ -293,9 +284,9 @@ text(sft$fitIndices[, 1],
      cex = cex1, col = "red")
 
 # trying power = 8
+# try using the estimate power function
 
-
-picked_power <- 6
+picked_power <- 3
 
 temp_cor <- cor       
 cor <- WGCNA::cor         # Force it to use WGCNA cor function (fix a namespace conflict issue)
@@ -357,7 +348,6 @@ plotDendroAndColors(
 #
 #
 #          Relate Modules assignments to treatment groups
-
 ##
 #
 #
@@ -399,7 +389,6 @@ MEs0$treatment = row.names(MEs0)
 
 # Adding other variables
 MEs0 <- cbind(MEs0, meta_df_CA1_neun)
-#MEs0 <- left_join(MEs0, meta_df, by = "treatment")
 
 
 ### Calculate correlation between traits and modules
@@ -412,6 +401,14 @@ traits <- meta_df_CA1_neun %>%
 #encoding traits
 traits_numeric <- ifelse(traits == "WW", 0 ,1) 
 
+traits_numeric <- traits %>%
+  mutate(
+  CC = ifelse(traits$Group == "CC", 1, 0),
+  WW = ifelse(traits$Group == "WW", 1, 0)
+)
+
+traits_numeric <- traits_numeric[, 2:3]
+
 moduleTraitCor = stats::cor(MEs0[,1:4],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
 
@@ -421,7 +418,8 @@ textMatrix = paste(signif(moduleTraitCor, 2), "\n(", signif(moduleTraitPvalue, 1
 dim(textMatrix) = dim(moduleTraitCor)
 
 # Adjust margins and font sizes
-par(mar = c(10, 10, 5, 5), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decrease margins and adjust font sizes
+par(mfrow = c(1, 1))
+par(mar = c(2, 2, 3, 3), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decrease margins and adjust font sizes
 
 # Plot the heatmap
 
@@ -464,6 +462,12 @@ mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
     limit = c(-1,1)) +
   theme(axis.text.x = element_text(angle=90)) +
   labs(title = "Module-trait Relationships_CA1_neun", y = "Modules", fill="corr")
+
+
+
+
+
+
 
 
 
