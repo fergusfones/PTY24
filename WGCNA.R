@@ -18,10 +18,17 @@ library(PerseusR)
 library(DESeq2)
 library(dplyr)
 library(pheatmap)
-install.packages("RColorBrewer")
+#install.packages("RColorBrewer")
 library(RColorBrewer)
-
-
+library(magrittr)
+library(clusterProfiler)
+#BiocManager::install("org.Mm.eg.db")
+library(org.Mm.eg.db)
+#BiocManager::install("clusterProfiler")
+library(clusterProfiler)
+library(purrr)
+BiocManager::install("VennDiagram")
+library(VennDiagram)
 ###########################################
 
 
@@ -105,7 +112,8 @@ dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix),
 dds <- DESeq(dds)
 
 # DEseq pipeline ends
-
+save(dds, file = "/Users/fergusfones/Desktop/Nanostring/dds.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/dds.Rdata")
 
 vsd <- varianceStabilizingTransformation(dds)
 # retains metadata, can be used for PCA, visualisation, further processing
@@ -158,6 +166,17 @@ expr_normalized_EC_rest <- expr_normalized[, grepl("rest", colnames(expr_normali
 
 
 
+save(expr_normalized_CA1_neun, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_neun.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_neun.Rdata")
+
+save(expr_normalized_CA1_rest, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_rest.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_rest.Rdata")
+
+save(expr_normalized_EC_neun, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_neun.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_neun.Rdata")
+
+save(expr_normalized_EC_rest, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_rest.Rdata")
+load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_rest.Rdata")
 
 
 expr_normalized_df <- data.frame(expr_normalized_CA1_neun) %>%
@@ -175,7 +194,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   ) +
   ylim(0, NA) +
   labs(
-    title = "Normalized and 95 quantile Expression_CA1_neun__ subset after normalisation",
+    title = "Normalized and 95 quantile Expression_EC_rest",
     x = "treatment",
     y = "normalized expression"
   )
@@ -194,7 +213,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   # correlation matrix
   
   
-  cor_matrix <-  t(expr_normalized_CA1_neun)
+  cor_matrix <-  t(expr_normalized_EC_rest)
   cor_matrix <- cor(cor_matrix, method = "spearman")
   
   colours <- colorRampPalette(brewer.pal(9, "Blues"))(225)
@@ -205,7 +224,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   
   # hierarchical clustering 
   
-htree <- hclust(dist(t(expr_normalized_CA1_neun)))
+htree <- hclust(dist(t(expr_normalized_EC_rest)))
 plot(htree, xlab = "samples", main = "hierarchical clustering ")
 
 
@@ -215,9 +234,6 @@ plot(htree, xlab = "samples", main = "hierarchical clustering ")
   #
   #
   #
-  
-  
-  
   #
   #
   ##
@@ -283,7 +299,6 @@ text(sft$fitIndices[, 1],
      labels = powers,
      cex = cex1, col = "red")
 
-# trying power = 8
 # try using the estimate power function
 
 picked_power <- 3
@@ -322,6 +337,7 @@ cor <- temp_cor
 
 # Convert labels to colors for plotting
 mergedColors = labels2colors(netwk$colors)
+
 # Plot the dendrogram and the module colors underneath
 plotDendroAndColors(
   netwk$dendrograms[[1]],
@@ -401,13 +417,13 @@ traits <- meta_df_CA1_neun %>%
 #encoding traits
 traits_numeric <- ifelse(traits == "WW", 0 ,1) 
 
-traits_numeric <- traits %>%
-  mutate(
-  CC = ifelse(traits$Group == "CC", 1, 0),
-  WW = ifelse(traits$Group == "WW", 1, 0)
-)
+#traits_numeric <- traits %>%
+#  mutate(
+ # CC = ifelse(traits$Group == "CC", 1, 0),
+#  WW = ifelse(traits$Group == "WW", 1, 0)
+#)
 
-traits_numeric <- traits_numeric[, 2:3]
+#traits_numeric <- traits_numeric[, 2:3]
 
 moduleTraitCor = stats::cor(MEs0[,1:4],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
@@ -442,7 +458,7 @@ labeledHeatmap(
 )
 
 # tidy & plot data
-mME = MEs0 %>%
+#mME = MEs0 %>%
   select(- c("SegmentDisplayName", "Histology.no.", "population", "grossRegion", "treatment")) %>%
   pivot_longer(cols = -Group) %>%
   mutate(
@@ -451,7 +467,7 @@ mME = MEs0 %>%
   )
 
 
-mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
+#mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
   geom_tile() +
   theme_bw() +
   scale_fill_gradient2(
@@ -461,7 +477,7 @@ mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
     midpoint = 0,
     limit = c(-1,1)) +
   theme(axis.text.x = element_text(angle=90)) +
-  labs(title = "Module-trait Relationships_CA1_neun", y = "Modules", fill="corr")
+  labs(title = "Module-trait Relationships_CA1_rest", y = "Modules", fill="corr")
 
 
 
@@ -491,9 +507,11 @@ mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
 # 
 
 
+# how many genes in each module
+table(module_df$colors)
 
 # pick out a few modules of interest here
-modules_of_interest = c("grey", "yellow")
+modules_of_interest = c("green", "yellow", "black", "turquoise")
 
 # Pull out list of genes in that module
 submod = module_df %>%
@@ -502,9 +520,9 @@ submod = module_df %>%
 row.names(module_df) = module_df$gene_id
 
 # Get normalized expression for those genes
-expr_normalized[1:5,1:10]
+expr_normalized_CA1_neun[1:5,1:10]
 
-subexpr = expr_normalized[submod$gene_id,]
+subexpr = expr_normalized_CA1_neun[submod$gene_id,]
 
 submod_df = data.frame(subexpr) %>%
   mutate(
@@ -528,6 +546,37 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
 
 
 
+######
+#
+# The function performs KEGG enrichment on significant results from two-way ANOVA
+# module_df: dataframe of modules resulting from WGCNA
+# path: character containing path in which to save the images
+#
+path <- ("/Users/fergusfones/Desktop/Nanostring/KEGG/")
+######
+
+KEGG_module <- function(module_df, path){
+  col_enrich_kegg <- lapply(unique(module_df$colors), function(color){
+    #gene_list <- strsplit(module_df[which(module_df$colors == color),"gene_id"],"\\.")
+    #gene_list <- lapply(1:length(gene_list), function(x){ gene_list[[x]][[1]]})
+    gene_list <-  module_df[which(module_df$colors == color),"gene_id"]
+    gene.df <- bitr(gene_list, fromType = "SYMBOL",
+                    toType = c("ENTREZID"),
+                    OrgDb = org.Mm.eg.db)
+    kegen <- enrichKEGG(gene     = gene.df$ENTREZID,
+                        organism     = "mmu",
+                        pvalueCutoff = 0.05)
+  })
+  names(col_enrich_kegg) <- unique(module_df$colors)
+  col_enrich_kegg <- col_enrich_kegg %>% keep( ~ nrow(.) !=0 )
+  lapply(names(col_enrich_kegg), function(i){
+    file_path <- paste0(path,i,"_enrich.png")
+    barplot((col_enrich_kegg[[i]]), showCategory = 10)
+    ggsave(file_path)
+  })
+}
+
+results <- KEGG_module(module_df, path)
 
 ##
 #
@@ -553,8 +602,9 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
 
 genes_of_interest = module_df %>%
   subset(colors %in% modules_of_interest)
+# dont think this is working properly
 
-expr_of_interest = expr_normalized[genes_of_interest$gene_id,]
+expr_of_interest = expr_normalized_CA1_neun[genes_of_interest$gene_id,]
 #expr_of_interest[1:5,1:5]
 
 TOM = TOMsimilarityFromExpr(t(expr_of_interest),
@@ -581,6 +631,46 @@ head(edge_list)
 
 # Export Network file to be read into Cytoscape, VisANT, etc
 write_delim(edge_list,
-            file = "edgelist.tsv",
+            file = "/Users/fergusfones/Desktop/Nanostring/edge_list.tsv",
             delim = "\t")
 
+#
+#
+#
+#
+#
+venn.diagram(x = list(module_df$gene_id[module_df$colors == "turquoise"], rownames(de_genes_toptable_CA1)),
+             category.names = c("WGCNA turq module", "DGE genes"),
+             filename = '#14_venn_diagramm.png',
+             output=TRUE
+)
+
+WGCNA_turq <-module_df$gene_id[module_df$colors == "turquoise"]
+toptable_CA1<- rownames(de_genes_toptable_CA1)
+
+write_lines(WGCNA_turq, file = "/Users/fergusfones/Desktop/Nanostring/WGCNA_turq.txt")
+write_lines(toptable_CA1, file = "/Users/fergusfones/Desktop/Nanostring/toptable_CA1.txt")
+
+turq_wgcna<- intersect(WGCNA_turq,toptable_CA1)
+
+
+
+
+
+#enrichment
+
+# turqouise module of CA1_nuen contains Gfap
+
+
+library(enrichR)
+
+dbs <- listEnrichrDbs()
+
+head(dbs)
+
+
+dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecular_Function_2023")
+
+turq_enriched <- enrichr(WGCNA_turq, dbs)
+
+plotEnrich(turq_enriched[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
