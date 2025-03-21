@@ -21,13 +21,12 @@ library(pheatmap)
 #install.packages("RColorBrewer")
 library(RColorBrewer)
 library(magrittr)
-library(clusterProfiler)
 #BiocManager::install("org.Mm.eg.db")
 library(org.Mm.eg.db)
 #BiocManager::install("clusterProfiler")
 library(clusterProfiler)
 library(purrr)
-BiocManager::install("VennDiagram")
+#iocManager::install("VennDiagram")
 library(VennDiagram)
 ###########################################
 
@@ -46,9 +45,6 @@ rownames(subCountData) <- subCountData$ProbeDisplayName
 
 
 
-# do i have to control for covariates like cell types and correct the data like we did in the GeoMX workflow?
-
-
 # need to transpose data, so gene probes are in the columns and 'treatments' are in the rows, in a count matrix
 WGCNA_matrix <- subCountData[,c(4,14:108)]
 
@@ -62,7 +58,10 @@ WGCNA_matrix <- WGCNA_matrix[, 2:96]
 WGCNA_matrix <- as.matrix(WGCNA_matrix)
 
 dim(WGCNA_matrix)
-# 19959, 95
+# 19959 genes, 95 samples
+
+
+
 
 #
 #
@@ -83,8 +82,6 @@ dim(WGCNA_matrix)
 
 meta_df <- read.csv("preProcessedMetaData_filtered.csv",header = T)
 meta_df <- meta_df[, c(6, 32, 35, 36, 38 )]
-
-#meta_df$age <- pathology$Month[pathology$Histology.no. %in% c("16/085", "16/095", "16/093", "16/083", "16/082", "16/092", "16/081", "16/099")]
 
 
 rownames(meta_df) <- meta_df[,1]
@@ -119,21 +116,16 @@ vsd <- varianceStabilizingTransformation(dds)
 # retains metadata, can be used for PCA, visualisation, further processing
 # linear regression fit was substituted for a local regression fit by the function
 
-
-
 wpn_vsd <- getVarianceStabilizedData(dds)
-
 
 rv_wpn <- rowVars(wpn_vsd) 
 summary(rv_wpn)
 
-q75_wpn <- quantile( rowVars(wpn_vsd), .75)  # <= original
-q5_wpn <- quantile( rowVars(wpn_vsd), .5) 
+
 q95_wpn <- quantile( rowVars(wpn_vsd), .95)  # <= 95 quantile reduces dataset
 expr_normalized <- wpn_vsd[ rv_wpn > q95_wpn, ]
-dim(expr_normalized)
-# whole normalised expression obj showing 998 genes with 95q, and 4990 with 75q
 
+dim(expr_normalized)
 
 
 #
@@ -224,7 +216,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   
   # hierarchical clustering 
   
-htree <- hclust(dist(t(expr_normalized_EC_rest)))
+htree <- hclust(dist(t(expr_normalized_EC_neun)))
 plot(htree, xlab = "samples", main = "hierarchical clustering ")
 
 
@@ -406,9 +398,7 @@ MEs0$treatment = row.names(MEs0)
 # Adding other variables
 MEs0 <- cbind(MEs0, meta_df_CA1_neun)
 
-
-### Calculate correlation between traits and modules
-
+### Remove grey module (junk)
 MEs0 <- MEs0[,-which(colnames(MEs0)=="MEgrey")]
 
 traits <- meta_df_CA1_neun %>%
@@ -417,15 +407,8 @@ traits <- meta_df_CA1_neun %>%
 #encoding traits
 traits_numeric <- ifelse(traits == "WW", 0 ,1) 
 
-#traits_numeric <- traits %>%
-#  mutate(
- # CC = ifelse(traits$Group == "CC", 1, 0),
-#  WW = ifelse(traits$Group == "WW", 1, 0)
-#)
-
-#traits_numeric <- traits_numeric[, 2:3]
-
-moduleTraitCor = stats::cor(MEs0[,1:4],traits_numeric , use = "p");
+# module trait correlation
+moduleTraitCor = stats::cor(MEs0[,1:7],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
 
 
@@ -445,8 +428,8 @@ par(mar = c(2, 2, 3, 3), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decreas
 labeledHeatmap(
   Matrix = moduleTraitCor,
   xLabels = colnames(traits_numeric),
-  yLabels = names(MEs0[1:4]),
-  ySymbols = names(MEs0[1:4]),
+  yLabels = names(MEs0[1:7]),
+  ySymbols = names(MEs0[1:7]),
   colorLabels = FALSE,
   colors = colorRampPalette(c("blue", "white", "red"))(50),  # Change color scheme if needed
   textMatrix = textMatrix,
@@ -511,7 +494,7 @@ labeledHeatmap(
 table(module_df$colors)
 
 # pick out a few modules of interest here
-modules_of_interest = c("green", "yellow", "black", "turquoise")
+modules_of_interest = c("brown", "turquoise", "yellow")
 
 # Pull out list of genes in that module
 submod = module_df %>%
@@ -520,7 +503,7 @@ submod = module_df %>%
 row.names(module_df) = module_df$gene_id
 
 # Get normalized expression for those genes
-expr_normalized_CA1_neun[1:5,1:10]
+expr_normalized_EC_neun[1:5,1:10]
 
 subexpr = expr_normalized_CA1_neun[submod$gene_id,]
 
@@ -545,38 +528,6 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
        y = "normalized expression")
 
 
-
-######
-#
-# The function performs KEGG enrichment on significant results from two-way ANOVA
-# module_df: dataframe of modules resulting from WGCNA
-# path: character containing path in which to save the images
-#
-path <- ("/Users/fergusfones/Desktop/Nanostring/KEGG/")
-######
-
-KEGG_module <- function(module_df, path){
-  col_enrich_kegg <- lapply(unique(module_df$colors), function(color){
-    #gene_list <- strsplit(module_df[which(module_df$colors == color),"gene_id"],"\\.")
-    #gene_list <- lapply(1:length(gene_list), function(x){ gene_list[[x]][[1]]})
-    gene_list <-  module_df[which(module_df$colors == color),"gene_id"]
-    gene.df <- bitr(gene_list, fromType = "SYMBOL",
-                    toType = c("ENTREZID"),
-                    OrgDb = org.Mm.eg.db)
-    kegen <- enrichKEGG(gene     = gene.df$ENTREZID,
-                        organism     = "mmu",
-                        pvalueCutoff = 0.05)
-  })
-  names(col_enrich_kegg) <- unique(module_df$colors)
-  col_enrich_kegg <- col_enrich_kegg %>% keep( ~ nrow(.) !=0 )
-  lapply(names(col_enrich_kegg), function(i){
-    file_path <- paste0(path,i,"_enrich.png")
-    barplot((col_enrich_kegg[[i]]), showCategory = 10)
-    ggsave(file_path)
-  })
-}
-
-results <- KEGG_module(module_df, path)
 
 ##
 #
@@ -639,27 +590,35 @@ write_delim(edge_list,
 #
 #
 #
-venn.diagram(x = list(module_df$gene_id[module_df$colors == "turquoise"], rownames(de_genes_toptable_CA1)),
-             category.names = c("WGCNA turq module", "DGE genes"),
-             filename = '#14_venn_diagramm.png',
-             output=TRUE
-)
+##
+##
+#
+#
+#
+##
+#
+##
+#
+# Gene ontology enrichment
+##
+##
+#
+#
+#
+##
+#
+##
+#
 
+
+# locate which module contains gene of interest and investigate ontology of module
 WGCNA_turq <-module_df$gene_id[module_df$colors == "turquoise"]
-toptable_CA1<- rownames(de_genes_toptable_CA1)
+
 
 write_lines(WGCNA_turq, file = "/Users/fergusfones/Desktop/Nanostring/WGCNA_turq.txt")
 write_lines(toptable_CA1, file = "/Users/fergusfones/Desktop/Nanostring/toptable_CA1.txt")
 
-turq_wgcna<- intersect(WGCNA_turq,toptable_CA1)
 
-
-
-
-
-#enrichment
-
-# turqouise module of CA1_nuen contains Gfap
 
 
 library(enrichR)
@@ -673,4 +632,84 @@ dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecul
 
 turq_enriched <- enrichr(WGCNA_turq, dbs)
 
-plotEnrich(turq_enriched[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+plotEnrich(turq_enriched[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+
+
+
+
+
+
+
+##
+##
+#
+#
+#
+##
+#
+##
+#
+#          EWCE of module
+##
+##
+#
+#
+#
+##
+#
+##
+#
+
+
+
+
+
+library(EWCE)
+library(ewceData)
+
+mouseCTD <- ewceData::ctd()
+
+
+#finally subset the list of names for your DEGs
+topGenes <- WGCNA_turq
+
+
+# This tests for enrichment in the mouse single cell dataset
+# Start out with 100 for quick running but when we run the analysis "finally" make this 10,000 reps
+results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
+                                           sctSpecies = "mouse",
+                                           genelistSpecies = "mouse",
+                                           hits = topGenes, 
+                                           reps = 100,
+                                           annotLevel = 1)
+
+saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
+results_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
+
+saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
+results_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
+
+#Take out the enrichment results
+ewceRes <- results_EC_rest$results
+
+
+# This method only tests for positive enrichment (sd_from_mean < 0 == NA)
+ewceRes[which(ewceRes$sd_from_mean < 0),"sd_from_mean"] <- NA
+
+#annotate significance
+ewceRes$sigAnnot <- NA
+ewceRes$sigAnnot[ewceRes$q < 0.05] <- "*"
+ewceRes$sigAnnot[ewceRes$q < 0.0001] <- "**"
+ewceRes$sigAnnot[ewceRes$q < 1e-10] <- "***"
+
+#Finally, plot your cell types
+ewceRes %>%
+  ggplot(aes(x = as.factor(CellType), y = sd_from_mean))+
+  geom_bar(stat = "identity")+
+  scale_y_continuous(expand = c(0,0),limits = c(0,max(ewceRes$sd_from_mean,na.rm = T) + max(ewceRes$sd_from_mean,na.rm = T)/10))+
+  geom_text(aes(label = sigAnnot, y = sd_from_mean + max(ewceRes$sd_from_mean,na.rm = T)/20), size = 8)+
+  ylab("SD From Mean")+
+  xlab("Cell type")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
