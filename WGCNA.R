@@ -1,15 +1,15 @@
 # The code performs a WGCNA analysis
 # 
 # Made using this tutorial : https://bioinformaticsworkbook.org/tutorials/wgcna.html#gsc.tab=0
-# And with help from Giulia Pegoraro, University of Exeter Medical School
+# And with help from Giulia Pegoraro, University of Exeter Medical School and Lachlan McBean, University of Exeter Medical School
 
 ###########################################
 setwd("/Users/fergusfones/Desktop/Nanostring/")
 getwd()
 
 
-install.packages("BiocManager")
-BiocManager::install(c("WGCNA", "devtools"))
+#install.packages("BiocManager")
+#BiocManager::install(c("WGCNA", "devtools"))
 library(devtools)
 install_github('jdrudolph/PerseusR')
 library(tidyverse)
@@ -62,6 +62,19 @@ dim(WGCNA_matrix)
 
 
 
+#Subsetting before normalisation
+
+
+WGCNA_matrix_CA1_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
+
+WGCNA_matrix_CA1_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("CA1", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
+
+WGCNA_matrix_EC_neun <- WGCNA_matrix[, grepl("neun", colnames(WGCNA_matrix)) & !grepl("rest", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
+
+
+WGCNA_matrix_EC_rest <- WGCNA_matrix[, grepl("rest", colnames(WGCNA_matrix)) & !grepl("neun", colnames(WGCNA_matrix)) & grepl("EC", colnames(WGCNA_matrix)) | colnames(WGCNA_matrix) == "TargetName"]
 
 #
 #
@@ -103,14 +116,13 @@ meta_df_EC_rest <- meta_df %>%
   filter(., population == "rest" & grepl("EC", rownames(meta_df)))
 
 
-dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix),
-                              meta_df,
+dds <- DESeqDataSetFromMatrix(round(WGCNA_matrix_CA1_neun),
+                              meta_df_CA1_neun,
                               design = ~Group)
 dds <- DESeq(dds)
 
 # DEseq pipeline ends
-save(dds, file = "/Users/fergusfones/Desktop/Nanostring/dds.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/dds.Rdata")
+
 
 vsd <- varianceStabilizingTransformation(dds)
 # retains metadata, can be used for PCA, visualisation, further processing
@@ -126,54 +138,16 @@ q95_wpn <- quantile( rowVars(wpn_vsd), .95)  # <= 95 quantile reduces dataset
 expr_normalized <- wpn_vsd[ rv_wpn > q95_wpn, ]
 
 dim(expr_normalized)
+#998, 95
+# for Ca1 nuen 998,24
+# for ec neun 998,23
+# for Ca1 rest 998,24
+# for ec rest 998,24
 
 
-#
-#
-#
-#
-#
-#
-#
-#
-# Subset after normalisation
-#
-#
-#
-#
-#
-#
-#
-
-expr_normalized_CA1_neun <- expr_normalized[, grepl("neun", colnames(expr_normalized)) & !grepl("rest", colnames(expr_normalized)) & grepl("CA1", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
-
-
-expr_normalized_CA1_rest <- expr_normalized[, grepl("rest", colnames(expr_normalized)) & !grepl("neun", colnames(expr_normalized)) & grepl("CA1", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
-
-
-expr_normalized_EC_neun <- expr_normalized[, grepl("neun", colnames(expr_normalized)) & !grepl("rest", colnames(expr_normalized)) & grepl("EC", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
-
-
-expr_normalized_EC_rest <- expr_normalized[, grepl("rest", colnames(expr_normalized)) & !grepl("neun", colnames(expr_normalized)) & grepl("EC", colnames(expr_normalized)) | colnames(expr_normalized) == "TargetName"]
-
-
-
-save(expr_normalized_CA1_neun, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_neun.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_neun.Rdata")
-
-save(expr_normalized_CA1_rest, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_rest.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_CA1_rest.Rdata")
-
-save(expr_normalized_EC_neun, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_neun.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_neun.Rdata")
-
-save(expr_normalized_EC_rest, file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_rest.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/expr_normalized_EC_rest.Rdata")
-
-
-expr_normalized_df <- data.frame(expr_normalized_CA1_neun) %>%
+expr_normalized_df <- data.frame(expr_normalized) %>%
   mutate(
-    Gene_id = row.names(expr_normalized_CA1_neun)
+    Gene_id = row.names(expr_normalized)
   ) %>%
   pivot_longer(-Gene_id)
 
@@ -205,7 +179,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   # correlation matrix
   
   
-  cor_matrix <-  t(expr_normalized_EC_rest)
+  cor_matrix <-  t(expr_normalized)
   cor_matrix <- cor(cor_matrix, method = "spearman")
   
   colours <- colorRampPalette(brewer.pal(9, "Blues"))(225)
@@ -216,7 +190,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   
   # hierarchical clustering 
   
-htree <- hclust(dist(t(expr_normalized_EC_neun)))
+htree <- hclust(dist(t(expr_normalized)))
 plot(htree, xlab = "samples", main = "hierarchical clustering ")
 
 
@@ -247,7 +221,7 @@ plot(htree, xlab = "samples", main = "hierarchical clustering ")
   #
 # 
 
-input_mat <- t(expr_normalized_CA1_neun)
+input_mat <- t(expr_normalized)
 
 # Allowing multi-threading
 allowWGCNAThreads() 
@@ -266,7 +240,6 @@ sft = pickSoftThreshold(
 
 par(mfrow = c(1,2));
 cex1 = 0.9;
-
 plot(sft$fitIndices[, 1],
      -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2],
      xlab = "Soft Threshold (power)",
@@ -275,10 +248,10 @@ plot(sft$fitIndices[, 1],
 )
 text(sft$fitIndices[, 1],
      -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2],
-     labels = powers, cex = cex1, col = "red"
+     labels = powers, cex = cex1, col = "red",
 )
-abline(h = 0.80, col = "red")
 
+abline(h = 0.8, col = "red")
 plot(sft$fitIndices[, 1],
      sft$fitIndices[, 5],
      xlab = "Soft Threshold (power)",
@@ -293,7 +266,7 @@ text(sft$fitIndices[, 1],
 
 # try using the estimate power function
 
-picked_power <- 3
+picked_power <- 9
 
 temp_cor <- cor       
 cor <- WGCNA::cor         # Force it to use WGCNA cor function (fix a namespace conflict issue)
@@ -372,14 +345,9 @@ module_df <- data.frame(
 )
 
 module_df[1:5,]
-#>            gene_id    colors
-#> 1 AC149818.2_FG001      blue
-#> 2 AC149829.2_FG003      blue
-#> 3 AC182617.3_FG001      blue
-#> 4 AC186512.3_FG001 turquoise
-#> 5 AC186512.3_FG007 turquoise
 
-write_delim(module_df,
+
+#write_delim(module_df,
             file = "gene_modules.txt",
             delim = "\t")
 
@@ -408,11 +376,11 @@ traits <- meta_df_CA1_neun %>%
 traits_numeric <- ifelse(traits == "WW", 0 ,1) 
 
 # module trait correlation
-moduleTraitCor = stats::cor(MEs0[,1:7],traits_numeric , use = "p");
+# adjust rows in MEs0 to just show modules
+moduleTraitCor = stats::cor(MEs0[,1:11],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
 
 
-png(paste0(path, title), width = 3000, height = 2000, res = 300)  # Increase resolution and dimensions
 textMatrix = paste(signif(moduleTraitCor, 2), "\n(", signif(moduleTraitPvalue, 1), ")", sep = "")
 dim(textMatrix) = dim(moduleTraitCor)
 
@@ -428,46 +396,17 @@ par(mar = c(2, 2, 3, 3), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decreas
 labeledHeatmap(
   Matrix = moduleTraitCor,
   xLabels = colnames(traits_numeric),
-  yLabels = names(MEs0[1:7]),
-  ySymbols = names(MEs0[1:7]),
+  yLabels = names(MEs0[,1:11]),
+  ySymbols = names(MEs0[,1:11]),
   colorLabels = FALSE,
   colors = colorRampPalette(c("blue", "white", "red"))(50),  # Change color scheme if needed
   textMatrix = textMatrix,
   setStdMargins = TRUE,
   plotLegend = TRUE,
-  cex.text = 0.7,  # Reduce label size
+  cex.text = 0.6,  # Reduce label size
   zlim = c(-1, 1),
   main = "Module-trait relationships"
 )
-
-# tidy & plot data
-#mME = MEs0 %>%
-  select(- c("SegmentDisplayName", "Histology.no.", "population", "grossRegion", "treatment")) %>%
-  pivot_longer(cols = -Group) %>%
-  mutate(
-    name = gsub("ME", "", name),
-    name = factor(name, levels = module_order)
-  )
-
-
-#mME %>% ggplot(., aes(x= Group, y=name, fill=value)) +
-  geom_tile() +
-  theme_bw() +
-  scale_fill_gradient2(
-    low = "blue",
-    high = "red",
-    mid = "white",
-    midpoint = 0,
-    limit = c(-1,1)) +
-  theme(axis.text.x = element_text(angle=90)) +
-  labs(title = "Module-trait Relationships_CA1_rest", y = "Modules", fill="corr")
-
-
-
-
-
-
-
 
 
 
@@ -494,7 +433,7 @@ labeledHeatmap(
 table(module_df$colors)
 
 # pick out a few modules of interest here
-modules_of_interest = c("brown", "turquoise", "yellow")
+modules_of_interest = c("turquoise")
 
 # Pull out list of genes in that module
 submod = module_df %>%
@@ -503,9 +442,9 @@ submod = module_df %>%
 row.names(module_df) = module_df$gene_id
 
 # Get normalized expression for those genes
-expr_normalized_EC_neun[1:5,1:10]
+expr_normalized[1:5,1:10]
 
-subexpr = expr_normalized_CA1_neun[submod$gene_id,]
+subexpr = expr_normalized[submod$gene_id,]
 
 submod_df = data.frame(subexpr) %>%
   mutate(
@@ -552,10 +491,10 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
 
 
 genes_of_interest = module_df %>%
-  subset(colors %in% modules_of_interest)
-# dont think this is working properly
+  subset(colors == "turquoise")
 
-expr_of_interest = expr_normalized_CA1_neun[genes_of_interest$gene_id,]
+
+expr_of_interest = expr_normalized[genes_of_interest$gene_id,]
 #expr_of_interest[1:5,1:5]
 
 TOM = TOMsimilarityFromExpr(t(expr_of_interest),
@@ -582,7 +521,7 @@ head(edge_list)
 
 # Export Network file to be read into Cytoscape, VisANT, etc
 write_delim(edge_list,
-            file = "/Users/fergusfones/Desktop/Nanostring/edge_list.tsv",
+            file = "/Users/fergusfones/Desktop/Nanostring/turq_list.tsv",
             delim = "\t")
 
 #
@@ -612,14 +551,21 @@ write_delim(edge_list,
 
 
 # locate which module contains gene of interest and investigate ontology of module
+module_df[module_df$gene_id == "Gfap",]
+module_df[module_df$gene_id == "Pfkm",]
+
+
 WGCNA_turq <-module_df$gene_id[module_df$colors == "turquoise"]
-
-
-write_lines(WGCNA_turq, file = "/Users/fergusfones/Desktop/Nanostring/WGCNA_turq.txt")
-write_lines(toptable_CA1, file = "/Users/fergusfones/Desktop/Nanostring/toptable_CA1.txt")
-
-
-
+WGCNA_brown <-module_df$gene_id[module_df$colors == "brown"]
+WGCNA_black <-module_df$gene_id[module_df$colors == "black"]
+WGCNA_green <-module_df$gene_id[module_df$colors == "green"]
+WGCNA_blue <-module_df$gene_id[module_df$colors == "blue"]
+WGCNA_yellow <-module_df$gene_id[module_df$colors == "yellow"]
+WGCNA_greenyellow <-module_df$gene_id[module_df$colors == "greenyellow"]
+WGCNA_magenta <-module_df$gene_id[module_df$colors == "magenta"]
+WGCNA_red <-module_df$gene_id[module_df$colors == "red"]
+WGCNA_pink <-module_df$gene_id[module_df$colors == "pink"]
+WGCNA_purple <-module_df$gene_id[module_df$colors == "purple"]
 
 library(enrichR)
 
@@ -630,9 +576,11 @@ head(dbs)
 
 dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecular_Function_2023")
 
-turq_enriched <- enrichr(WGCNA_turq, dbs)
+module_enriched <- enrichr(WGCNA_yellow, dbs)
 
-plotEnrich(turq_enriched[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+# maybe add p value threshold at 0.05
+
+plotEnrich(module_enriched[[2]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
 
 
 
@@ -683,14 +631,9 @@ results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
                                            reps = 100,
                                            annotLevel = 1)
 
-saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
-results_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
-
-saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
-results_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
 
 #Take out the enrichment results
-ewceRes <- results_EC_rest$results
+ewceRes <- results$results
 
 
 # This method only tests for positive enrichment (sd_from_mean < 0 == NA)
