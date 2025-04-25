@@ -11,7 +11,7 @@ getwd()
 #install.packages("BiocManager")
 #BiocManager::install(c("WGCNA", "devtools"))
 library(devtools)
-install_github('jdrudolph/PerseusR')
+#install_github('jdrudolph/PerseusR')
 library(tidyverse)
 library(WGCNA)
 library(PerseusR)
@@ -227,7 +227,7 @@ input_mat <- t(expr_normalized)
 allowWGCNAThreads() 
 
 # Choose a set of soft-thresholding powers
-powers = c(c(1:10), seq(from = 12, to = 20, by = 2))
+powers = c(c(1:10), seq(from = 12, to = 30, by = 2))
 
 # Call the network topology analysis function
 sft = pickSoftThreshold(
@@ -347,11 +347,6 @@ module_df <- data.frame(
 module_df[1:5,]
 
 
-#write_delim(module_df,
-            file = "gene_modules.txt",
-            delim = "\t")
-
-
 # Get Module Eigengenes per cluster
 MEs0 <- moduleEigengenes(input_mat, mergedColors)$eigengenes
 
@@ -373,7 +368,8 @@ traits <- meta_df_CA1_neun %>%
   select(- c("SegmentDisplayName", "Histology.no.", "population", "grossRegion"))
 
 #encoding traits
-traits_numeric <- ifelse(traits == "WW", 0 ,1) 
+# do as factor
+traits_numeric <- ifelse(traits == "WW", 0 ,1)
 
 # module trait correlation
 # adjust rows in MEs0 to just show modules
@@ -433,7 +429,7 @@ labeledHeatmap(
 table(module_df$colors)
 
 # pick out a few modules of interest here
-modules_of_interest = c("turquoise")
+modules_of_interest = c("")
 
 # Pull out list of genes in that module
 submod = module_df %>%
@@ -467,63 +463,6 @@ submod_df %>% ggplot(., aes(x=name, y=value, group=gene_id)) +
        y = "normalized expression")
 
 
-
-##
-#
-#
-#
-#
-#
-#
-#          Generate and export networks
-
-##
-#
-#
-#
-#
-#
-#
-# 
-
-
-
-
-
-genes_of_interest = module_df %>%
-  subset(colors == "turquoise")
-
-
-expr_of_interest = expr_normalized[genes_of_interest$gene_id,]
-#expr_of_interest[1:5,1:5]
-
-TOM = TOMsimilarityFromExpr(t(expr_of_interest),
-                            power = picked_power)
-
-# Add gene names to row and columns
-row.names(TOM) = row.names(expr_of_interest)
-colnames(TOM) = row.names(expr_of_interest)
-
-edge_list = data.frame(TOM) %>%
-  mutate(
-    gene1 = row.names(.)
-  ) %>%
-  pivot_longer(-gene1) %>%
-  dplyr::rename(gene2 = name, correlation = value) %>%
-  unique() %>%
-  subset(!(gene1==gene2)) %>%
-  mutate(
-    module1 = module_df[gene1,]$colors,
-    module2 = module_df[gene2,]$colors
-  )
-
-head(edge_list)
-
-# Export Network file to be read into Cytoscape, VisANT, etc
-write_delim(edge_list,
-            file = "/Users/fergusfones/Desktop/Nanostring/turq_list.tsv",
-            delim = "\t")
-
 #
 #
 #
@@ -554,6 +493,7 @@ write_delim(edge_list,
 module_df[module_df$gene_id == "Gfap",]
 module_df[module_df$gene_id == "Pfkm",]
 
+# refesh each of these objects when running a new subset
 
 WGCNA_turq <-module_df$gene_id[module_df$colors == "turquoise"]
 WGCNA_brown <-module_df$gene_id[module_df$colors == "brown"]
@@ -576,11 +516,11 @@ head(dbs)
 
 dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecular_Function_2023")
 
-module_enriched <- enrichr(WGCNA_yellow, dbs)
+module_enriched <- enrichr(WGCNA_turq, dbs)
 
 # maybe add p value threshold at 0.05
 
-plotEnrich(module_enriched[[2]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+plotEnrich(module_enriched[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
 
 
 
@@ -655,4 +595,64 @@ ewceRes %>%
   xlab("Cell type")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+
+
+
+##
+#
+#
+#
+#
+#
+#
+#          Generate and export networks
+
+##
+#
+#
+#
+#
+#
+#
+# 
+
+
+
+
+
+genes_of_interest = module_df %>%
+  subset(colors == "turquoise")
+
+
+expr_of_interest = expr_normalized[genes_of_interest$gene_id,]
+#expr_of_interest[1:5,1:5]
+
+TOM = TOMsimilarityFromExpr(t(expr_of_interest),
+                            power = picked_power)
+
+# Add gene names to row and columns
+row.names(TOM) = row.names(expr_of_interest)
+colnames(TOM) = row.names(expr_of_interest)
+
+edge_list = data.frame(TOM) %>%
+  mutate(
+    gene1 = row.names(.)
+  ) %>%
+  pivot_longer(-gene1) %>%
+  dplyr::rename(gene2 = name, correlation = value) %>%
+  unique() %>%
+  subset(!(gene1==gene2)) %>%
+  mutate(
+    module1 = module_df[gene1,]$colors,
+    module2 = module_df[gene2,]$colors
+  )
+
+head(edge_list)
+
+# Export Network file to be read into Cytoscape, VisANT, etc
+write_delim(edge_list,
+            file = "/Users/fergusfones/Desktop/Nanostring/turq_list.tsv",
+            delim = "\t")
 
