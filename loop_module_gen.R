@@ -1,3 +1,9 @@
+library(EWCE)
+library(ewceData)
+library(tidyverse)
+library(WGCNA)
+
+
 seeds <- 1:10
 
 results_list <- list()
@@ -6,10 +12,46 @@ pval_list <- list()
 
 mouseCTD <- ewceData::ctd()
 
+picked_power = 9
+
 #Loop over each seed
 
 for (i in seeds) {
+  print(paste("Running seed", i))
   set.seed(i)  # Set the seed
+  
+  temp_cor <- cor       
+  cor <- WGCNA::cor 
+  
+  netwk <- blockwiseModules(input_mat,                # <= input here
+                            
+                            # == Adjacency Function ==
+                            power = picked_power,                # <= power here
+                            networkType = "signed",
+                            
+                            # == Tree and Block Options ==
+                            deepSplit = 2,
+                            pamRespectsDendro = F,
+                            # detectCutHeight = 0.75,
+                            minModuleSize = 30,
+                            maxBlockSize = 4000,
+                            
+                            # == Module Adjustments ==
+                            reassignThreshold = 0,
+                            mergeCutHeight = 0.25,
+                            
+                            # == TOM == Archive the run results in TOM file (saves time)
+                            saveTOMs = T,
+                            saveTOMFileBase = "ER",
+                            
+                            # == Output Options
+                            numericLabels = T,
+                            verbose = FALSE)
+  
+  cor <- temp_cor
+  
+  mergedColors = labels2colors(netwk$colors)
+  
   module_df <- data.frame(
     gene_id = names(netwk$colors),
     colors = labels2colors(netwk$colors)
@@ -57,6 +99,7 @@ for (i in seeds) {
 
     # Loop over all modules
     for (mod_name in names(gene_lists)) {
+      print(paste("Running module", mod_name))
       genes <- gene_lists[[mod_name]]
 
       # Run EWCE
@@ -66,7 +109,8 @@ for (i in seeds) {
         genelistSpecies = "mouse",
         hits = genes,
         reps = 1000,
-        annotLevel = 1
+        annotLevel = 1,
+        verbose = FALSE
       )
 
       # Save results with metadata
@@ -96,13 +140,25 @@ for (i in seeds) {
 
 ewce_combined <- bind_rows(results_list)
 
-ggplot(ewce_combined, aes(x = CellType, y = sd_from_mean, fill = as.factor(seed))) +
-  geom_bar(stat = "identity", position = "dodge") +
-  facet_wrap(~ seed) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Get unique module names
+modules <- unique(ewce_combined$module)
 
-
+# Loop through each module and generate a plot
+for (mod in modules){
+  df_sub <- ewce_combined %>% filter(module == mod)
+  
+  p <- ggplot(df_sub, aes(x = CellType, y = fold_change, fill = as.factor(seed))) +
+    geom_bar(stat = "identity", position = "dodge") +
+    facet_wrap(~ seed) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = paste("Enrichment for module:", mod))
+  
+  print(p)  # Show the plot in RStudio
+  
+}
+  
+  
 # Plot the heatmap
 
 
@@ -149,5 +205,36 @@ module_sizes <- map_dfr(names(results_list), function(name) {
 ggplot(module_sizes, aes(x = module, y = n_genes, fill = as.factor(seed))) +
   geom_bar(stat = "identity", position = "dodge") +
   theme_bw() + facet_wrap(~seed)
+
+
+
+
+# Run blockwiseModules twice on the same input to test determinism
+net1 <- blockwiseModules(input_mat, power = picked_power,
+                         networkType = "signed",
+                         deepSplit = 2,
+                         pamRespectsDendro = FALSE,
+                         minModuleSize = 30,
+                         maxBlockSize = 4000,
+                         reassignThreshold = 0,
+                         mergeCutHeight = 0.25,
+                         saveTOMs = FALSE,
+                         numericLabels = TRUE,
+                         verbose = 0)
+
+net2 <- blockwiseModules(input_mat, power = picked_power,
+                         networkType = "signed",
+                         deepSplit = 2,
+                         pamRespectsDendro = FALSE,
+                         minModuleSize = 30,
+                         maxBlockSize = 4000,
+                         reassignThreshold = 0,
+                         mergeCutHeight = 0.25,
+                         saveTOMs = FALSE,
+                         numericLabels = TRUE,
+                         verbose = 0)
+
+# Compare color assignments
+identical(net1$colors, net2$colors)
 
 
