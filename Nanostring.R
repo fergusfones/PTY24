@@ -62,11 +62,8 @@ plotGeneQC(spe, ordannots = "grossRegion", col = grossRegion, point_size = 2, to
 
 spe <- addPerROIQC(spe)
 
-plotGeneQC(spe)
-# i think its adding the removed gene function to spe.
-
 # ROI QC
-colData(spe)$seqFilt <- colData(spe)$SequencingSaturation < 90 
+colData(spe)$seqFilt <- colData(spe)$SequencingSaturation < 90
 plotROIQC(spe,  x_axis = "AOISurfaceArea", x_lab = "AOI Surface Area", y_axis = "lib_size", y_lab = "Library size", col = Group)
 plotROIQC(spe,  x_axis = "AOISurfaceArea", x_lab = "AOI Surface Area", y_axis = "lib_size", y_lab = "Library size", col = SlideName)
 plotROIQC(spe,  x_axis = "AOISurfaceArea", x_lab = "AOI Surface Area", y_axis = "lib_size", y_lab = "Library size", col = grossRegion)
@@ -78,8 +75,23 @@ plotROIQC(spe,  x_axis = "AOISurfaceArea", x_threshold = 6500, x_lab = "AOI Surf
 
 plotROIQC(spe,  x_axis = "AOINucleiCount",  x_lab = "AOINucleiCount", y_axis = "lib_size", y_lab = "Library size", col = population)
 
+#qc <- colData(spe)$AOINucleiCount > 150
+# could do for lib size
 
-hist(colData(spe)$AlignedReads)
+#table(qc)
+
+hist(colData(spe)$AlignedReads,
+     xlab = "Read Count",
+     main = "Aligned Reads")
+
+hist(colData(spe)$AOINucleiCount,
+     xlab = "Nuclei Count",
+     main = "AOI Nuclei Count",
+     breaks = 100,
+     xlim = c(0,2000),
+     xaxt = 'n')
+axis(side=1, at=seq(0, 2000, by=200))
+
 
 # Relative log expression distribution
 
@@ -107,6 +119,7 @@ drawPCA(spe, precomputed = pca_results, color = population)
 drawPCA(spe, precomputed = pca_results, color = SlideName)
 drawPCA(spe, precomputed = pca_results, color = grossRegion)
 drawPCA(spe, precomputed = pca_results, color = Group)
+drawPCA(spe, precomputed = pca_results, color = Group, dims = c(3,4))
 
 plotScreePCA(spe, precomputed = pca_results)
 
@@ -134,15 +147,44 @@ plotDR(spe, dimred = "UMAP", col = population)
 plotDR(spe, dimred = "UMAP", col = Group)
 
 
+#
+#
+#
+#
+#
 # Normalisation
 
 spe_tmm <- geomxNorm(spe, method = "TMM")
 spe_tmm <- addPerROIQC(spe_tmm, rm_genes = FALSE)
 
 plotRLExpr(spe_tmm, assay = 2, color = Group) + ggtitle("TMM")
+plotRLExpr(spe_tmm, assay = 2, color = SlideName) + ggtitle("TMM")
+plotRLExpr(spe_tmm, assay = 2, color = population) + ggtitle("TMM")
+plotRLExpr(spe_tmm, assay = 2, color = grossRegion) + ggtitle("TMM")
+
+set.seed(100)
+
+spe_tmm <- scater::runPCA(spe_tmm)
+
+pca_results_tmm <- reducedDim(spe_tmm, "PCA")
+
+
+plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = Group)
+
+plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = grossRegion)
+plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
+plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = population)
+
+plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = lib_size, n_dimension = 6)
 
 #spe_cpm <- geomxNorm(spe, method = "CPM")
 #plotRLExpr(spe_cpm, assay = 2, color = population) + ggtitle("CPM")
+
+
+
+
+
+# deconvolution
 
 NormCountData <- assay(spe_tmm)
 # NormCountData<- NormCountData[-which(NormCountData$TargetName %in% duplicates),]
@@ -194,24 +236,9 @@ colnames(colData(spe))[42:45] <- c( "Astro" , "Immune_Vascular" , "Neuronal" , "
 
 #####################################################
 
-set.seed(100)
-
-spe_tmm <- scater::runPCA(spe_tmm)
-
-pca_results_tmm <- reducedDim(spe_tmm, "PCA")
-
-
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = Group)
-
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = grossRegion)
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = population)
-
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = lib_size, n_dimension = 6)
-
 # batch correction
 
-# substetting before RUV corrections
+# subsetting before RUV corrections
 
 spe_CA1_neun <- spe[,colData(spe)$grossRegion == "CA1" &
                       colData(spe)$population == "neun"]
@@ -507,10 +534,10 @@ library(edgeR)
 library(limma)
 
 
-dge <- SE2DGEList(spe_CA1_rest_ruv_post)
+dge <- SE2DGEList(spe_CA1_neun_ruv_post)
 
 
-design <- model.matrix(~0 + Group + Astro + Oligo + Immune_Vascular + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_CA1_rest_ruv_post))
+design <- model.matrix(~0 + Group + Astro + Oligo + Immune_Vascular + ruv_W1 + ruv_W2 + ruv_W3 , data = colData(spe_CA1_neun_ruv_post))
 
 #table(colData(spe_ruv)$population,colData(spe_ruv)$grossRegion)
 
@@ -564,12 +591,12 @@ fit2_EC_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_ne
 fit2_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_rest.Rdata")
 fit2_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
 
-results_fit2_CA1rest<- decideTests(fit2_CA1_rest)
-summary_fit2_CA1rest <- summary(results_fit2_CA1rest)
+results_fit2_CA1neun<- decideTests(fit2_CA1_neun)
+summary_fit2_CA1neun <- summary(results_fit2_CA1neun)
 
-summary_fit2_CA1rest
+summary_fit2_CA1neun
 
-results_fit2_ECrest <- decideTests(fit2_EC_rest)
+results_fit2_ECrest <- decideTests(fit2_CA1_neun)
 summary_fit2_ECrest <- summary(results_fit2_ECrest)
 
 summary_fit2_ECrest
@@ -588,7 +615,7 @@ de_results_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "P", n = Inf)
 
 geneIndex <- rownames(de_results_CA1[which(de_results_CA1$adj.P.Val < 0.05 & de_results_CA1$P.Value < 0.05 &  abs(de_results_CA1$logFC) > 0.5),])
 geneIndex2 <- rownames(de_results_EC_rest[which(de_results_EC_rest$adj.P.Val < 0.05 & de_results_EC_rest$P.Value < 0.05 &  abs(de_results_EC_rest$logFC) > 0.5),])
-
+geneIndexx <- rownames(de_results_CA1)
 
 plot(de_results_CA1[geneIndex,"logFC"],de_results_EC[geneIndex,"logFC"]) 
 text(de_results_CA1[geneIndex, "logFC"], de_results_EC[geneIndex, "logFC"], 
@@ -698,3 +725,8 @@ ff %>%
   ggtitle("significant genes") +
   scale_color_manual(values = c("blue","gray","red")) +
   theme(text = element_text(size=15))
+
+sigEC <- de_results_EC[which(de_results_EC$adj.P.Val < 0.05 & abs(de_results_EC$logFC) > 0.5 ),]
+
+de_results_EC[de_results_CA1$logFC < -0.5 & de_results_EC$logFC > 0.5 & de_results_EC$adj.P.Val <0.05 ,]
+
