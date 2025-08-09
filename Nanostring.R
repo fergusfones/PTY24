@@ -1,6 +1,12 @@
+# Nanostring script
+# Authors - Fergus Fones (University of Exeter), Joshua Harvey (University of Exeter Medical School)
+
+
+
 setwd("/Users/fergusfones/Desktop/Nanostring/")
 getwd()
 
+#packages
 library(standR)
 library(SpatialExperiment)
 library(ggplot2)
@@ -16,6 +22,8 @@ library(fastDummies)
 library(reshape2)
 library(dplyr)
 library(ggrepel)
+library(scater)
+library(DT)
 
 
 metaData <- read.csv("preProcessedMetaData_filtered.csv",header = T)
@@ -33,15 +41,6 @@ spe <- readGeoMx(countFile = subCountData[,c(4,14:108)],sampleAnnoFile = metaDat
                  featureAnnoFile = subCountData[,-c(14:108)],rmNegProbe = T) 
 
 # general:
-head(metaData)[, 1:5]
-head(countDataa)[,1:5]
-head(pathology)[,1:5]
-
-assayNames(spe)
-colData(spe)[1:5,1:5]
-rowData(spe)[1:5,1:5]
-
-metaData(spe)$NegProbes[,1:5]
 
 plotSampleInfo(spe, column2plot = c("Group", "SlideName", "grossRegion", "population"))
 
@@ -82,17 +81,21 @@ plotROIQC(spe,  x_axis = "AOINucleiCount",  x_lab = "AOINucleiCount", y_axis = "
 
 hist(colData(spe)$AlignedReads,
      xlab = "Read Count",
-     main = "Aligned Reads")
+     main = "Aligned Reads",
+     xlim = c(0, 3e7), 
+     breaks = "FD")
+
+mean((colData(spe)$AlignedReads))
 
 hist(colData(spe)$AOINucleiCount,
      xlab = "Nuclei Count",
      main = "AOI Nuclei Count",
-     breaks = 100,
+     breaks = "FD",
      xlim = c(0,2000),
      xaxt = 'n')
 axis(side=1, at=seq(0, 2000, by=200))
 
-
+mean((colData(spe)$AOINucleiCount))
 # Relative log expression distribution
 
 plotRLExpr(spe)
@@ -107,7 +110,6 @@ plotRLExpr(spe, ordannots = "Group", assay = 2, color = Group)
 
 # Dimension reduction
 
-library(scater)
 set.seed(100)
 
 spe <- scater::runPCA(spe)
@@ -132,19 +134,6 @@ plotPCAbiplot(spe, n_loadings = 10, precomputed = pca_results, col = grossRegion
 plotPCAbiplot(spe, n_loadings = 10, precomputed = pca_results, col = Group)
 plotPCAbiplot(spe, n_loadings = 10, precomputed = pca_results, col = SlideName)
 plotPCAbiplot(spe, n_loadings = 10, precomputed = pca_results, col = population)
-
-# MDS
-
-standR::plotMDS(spe, assay = 2, color = population)
-#can make more if needed, does similar thing to pca plots
-
-# UMAP
-set.seed(100)
-
-spe <- scater::runUMAP(spe, dimred = "PCA")
-
-plotDR(spe, dimred = "UMAP", col = population)
-plotDR(spe, dimred = "UMAP", col = Group)
 
 
 #
@@ -176,12 +165,6 @@ plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = population)
 
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = lib_size, n_dimension = 6)
-
-#spe_cpm <- geomxNorm(spe, method = "CPM")
-#plotRLExpr(spe_cpm, assay = 2, color = population) + ggtitle("CPM")
-
-
-
 
 
 # deconvolution
@@ -301,212 +284,12 @@ plotPairPCA(spe_EC_rest_ruv_post, assay = 2, color = Group, title = "spe_EC_rest
 
 
 
-# deconvolution
-
-BiocManager::install("SpatialDecon")
-library(SpatialDecon)
-
-norm <- assay(spe_cpm)
-
-duplicates <- c("D830030K20Rik", "Gm10406", "LOC118568634")
-subCountData <- countDataa[-which(countDataa$TargetName %in% duplicates),]  
-rownames(subCountData) <- subCountData$ProbeDisplayName
-
-norm <- rbind(norm,subCountData[grep("NegProbe",subCountData$TargetName),14:108])
-negSet<- rownames(subCountData[grep("NegProbe",subCountData$TargetName),14:108])
-# row.names(norm)[(nrow(norm) - 209):nrow(norm)] <- paste("NegProbe-WX",1:210)
-bg2 = derive_GeoMx_background(norm = norm,
-                              probepool = rep(1, nrow(norm)),negnames = negSet)
-norm <- as.matrix(assay(spe_cpm))
-
-mousebrain <- download_profile_matrix(species = "Mouse",
-                                      age_group = "Adult", 
-                                      matrixname = "Brain_AllenBrainAtlas")
-
-#mousebrain2 <- download_profile_matrix(species = "Mouse",
-                                       age_group = "Adult", 
-                                       matrixname = "Brain_MCA")
-
-#mousebrain3 <- download_profile_matrix(species = "Mouse",
-                                      age_group = "Adult", 
-                                      matrixname = "Allen_Brain_Atlas_10x_scRNA_2021")
-
-
-res <- spatialdecon(norm = norm,
-                    bg = bg2,
-                    X = mousebrain,
-                    align_genes = TRUE)
-
-#res2 <- spatialdecon(norm = norm,
-                    bg = bg2,
-                    X = mousebrain2,
-                    align_genes = TRUE)
-
-res3 <- spatialdecon(norm = norm,
-                     bg = bg2,
-                     X = custom_mtx_seurat,
-                     align_genes = TRUE)
-
-
-save(res, file = "/Users/fergusfones/Desktop/Nanostring/res.Rdata")
-save(res2, file = "/Users/fergusfones/Desktop/Nanostring/res2.Rdata")
-save(res3, file = "/Users/fergusfones/Desktop/Nanostring/res3.Rdata")
-
-load(file = "/Users/fergusfones/Desktop/Nanostring/res.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/res2.Rdata")
-load(file = "/Users/fergusfones/Desktop/Nanostring/res3.Rdata")
-
-
-#colSums(res$prop_of_all)
-
-#samples_subset <- colnames(spe_tmm)[colData(spe_tmm)$grossRegion %in%  c("CA1", "EC")]
-
-#subset_prop <- res$prop_of_all
-
-#spe_sub <- spe_tmm[,samples_subset]
-
-#long_subset_prop <- subset_prop %>%
-  #as.data.frame() %>%
-  #rownames_to_column("CellTypes") %>%
-  #gather(samples, prop, -CellTypes)
-
-BiocManager::install("speckle")
-library(speckle)
-library(ggrepel)
-
-# restructing data from wide to long
-# setup for res 1
-res_prop.df <- as.data.frame(res$prop_of_all)
-
-long_res <- res_prop.df %>% 
-  rownames_to_column(var = "cell_type") %>%
-  pivot_longer(cols = "4_1_CA1_neun":"1_6_EC_rest",
-               names_to = "region", 
-               values_to = "proportion")
-
-region<- colnames(spe_tmm)
-
-pop_group <- cbind(region, spe_tmm$grossRegion, spe_tmm$population, spe_tmm$Group)
-
-long_ress_added <- left_join(long_res, pop_group, by = 'region', copy = T)
-colnames(long_ress_added)[4]<-paste("grossRegion")
-colnames(long_ress_added)[5]<-paste("population")
-colnames(long_ress_added)[6]<-paste("Group") 
-
-long_ress_added
-
-# setup for res 2
-
-res2_prop.df <- as.data.frame(res2$prop_of_all)
-
-long_res2 <- res2_prop.df %>% 
-  rownames_to_column(var = "cell_type") %>%
-  pivot_longer(cols = "4_1_CA1_neun":"1_6_EC_rest",
-               names_to = "region", 
-               values_to = "proportion")
-
-region<- colnames(spe_tmm)
-
-pop_group <- cbind(region, spe_tmm$grossRegion, spe_tmm$population, spe_tmm$Group)
-
-long_ress_added2 <- left_join(long_res2, pop_group, by = 'region', copy = T)
-colnames(long_ress_added2)[4]<-paste("grossRegion")
-colnames(long_ress_added2)[5]<-paste("population")
-colnames(long_ress_added2)[6]<-paste("Group") 
-
-long_ress_added2
-
-#deconvolution of res and res2
- 
-long_ress_added2 %>%
-  ggplot(aes(x = region, y = proportion, fill = cell_type)) +
-  geom_bar(stat = "identity", position = "stack", color = "black", width = .7) +
-  coord_flip() +
-  theme_bw() +
-  theme(legend.position = "bottom")
-
-long_ress_added2 %>%
-  filter(grossRegion == "EC") %>%
-  ggplot(aes(Group, proportion, fill = population)) +
-  geom_violin() +
-  facet_wrap(~cell_type) +
-  theme_bw() +
-  xlab("") +
-  ylab("Proportion")
-
-long_ress_added2 %>%
-filter(population == "neun") %>%
-  ggplot(aes(x = cell_type, y = region, fill = proportion)) +
-  geom_tile()+
-  theme_bw() +
-  xlab("Cell Type") +
-  ylab("Individidual/region")+
-  scale_fill_viridis_c()
-
-long_ress_added %>%
-  ggplot(aes(x = region, y = proportion, fill = cell_type)) +
-  geom_bar(stat = "identity", position = "stack", color = "black", width = .7) +
-  coord_flip() +
-  theme_bw() +
-  theme(legend.position = "bottom")
-
-long_ress_added %>%
-  filter(grossRegion == "CA1") %>%
-  ggplot(aes(Group, proportion, fill = population)) +
-  geom_violin() +
-  facet_wrap(~cell_type) +
-  theme_bw() +
-  xlab("") +
-  ylab("Proportion")
-
-
-
-# deconvolution using long read ref data
-
-
-long_res3 <- res3$prop_of_all %>% 
-  as.data.frame() %>%
-  rownames_to_column(var = "cell_type") %>%
-  pivot_longer(cols = "4_1_CA1_neun":"1_6_EC_rest",
-               names_to = "region", 
-               values_to = "proportion")
-
-long_res3 %>%
-  ggplot(aes(x = region, y = proportion, fill = cell_type)) +
-  geom_bar(stat = "identity", position = "stack", color = "black", width = .7) +
-  coord_flip() +
-  theme_bw() +
-  theme(legend.position = "bottom")
-
-ggplot(long_res3[-grep("neun",long_res3$region),],aes(x = region, y = proportion, fill = cell_type)) +
-  geom_bar(stat = "identity", position = "stack", color = "black", width = .7) +
-  coord_flip() +
-  theme_bw() +
-  theme(legend.position = "bottom")
-
-long_res3 %>%
-  ggplot(aes(region, proportion, fill = cell_type)) +
-  geom_violin() +
-  facet_wrap(~cell_type) +
-  theme_bw() +
-  xlab("") +
-  ylab("Proportion")
-
-
-heatmap(res3$beta, cexCol = 0.5, cexRow = 0.7, margins = c(10,7))
-image()
-
-
+#####################################################
 # cor PC test
 
 
 load("corPCtest.R")
 corPCtest(speOb = spe_tmm, pcaOb =  pca_results_tmm, nPC = 10, colLabs = c("SlideName", "lib_size", "AOISurfaceArea", "population", "grossRegion", "Group"))
-library(ggplot2)
-library(tidyverse)
-library(dplyr)
-library(fastDummies)  
-library(reshape2)
 
 print(plotPairPCA(spe_tmm, assay = 2, n_dimension = 4, color = lib_size))
 
@@ -528,10 +311,7 @@ corPCtest(speOb = spe_lrb, pcaOb =  PCA_results_spel, nPC = 10, colLabs = c("Sli
 
 
 
-#### Differential expression
-
-library(edgeR)
-library(limma)
+#### Differential gene expression
 
 
 dge <- SE2DGEList(spe_CA1_neun_ruv_post)
@@ -673,7 +453,6 @@ de_results_EC_rest %>%
   scale_color_manual(values = c("blue","gray","red")) +
   theme(text = element_text(size=15))
 
-library(DT)
 
 updn_cols <- c(RColorBrewer::brewer.pal(6, 'Greens')[2], RColorBrewer::brewer.pal(6, 'Purples')[2])
 
@@ -692,7 +471,15 @@ de_genes_toptable_EC %>%
                   valueColumns = 'logFC',
                   backgroundColor = DT::styleInterval(0, rev(updn_cols))) %>%
   DT::formatSignif(1:4, digits = 4)
+
+
+
+
+
 ######################
+# Target gene screening
+
+
 
 de_results_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "P", n = Inf)
 de_results_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "P", n = Inf)
