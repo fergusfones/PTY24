@@ -30,6 +30,7 @@ library(WGCNA)
 library(PerseusR)
 library(DESeq2)
 library(enrichR)
+library(tibble)
 mouseCTD <- ewceData::ctd()
 dbs <- listEnrichrDbs()
 dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecular_Function_2023")
@@ -67,8 +68,6 @@ spe <- addPerROIQC(spe, rm_genes = TRUE)
 
 plotGeneQC(spe, ordannots = "grossRegion", col = grossRegion, point_size = 2, top_n = 10)
 # only 5 genes removed
-
-spe <- addPerROIQC(spe)
 
 # ROI QC
 colData(spe)$seqFilt <- colData(spe)$SequencingSaturation < 90
@@ -357,14 +356,14 @@ text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,
 
 v <- voom(dge, design)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
 
-v <- voom(dge, design,block = colData(spe_CA1_rest_ruv_post)$Histology.no., correlation =
+v <- voom(dge, design,block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
             corfit$consensus)
 
-corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no.)
+corfit <- duplicateCorrelation(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no.)
 
-fit <- lmFit(v, design, block = colData(spe_CA1_rest_ruv_post)$Histology.no., correlation =
+fit <- lmFit(v, design, block = colData(spe_CA1_neun_ruv_post)$Histology.no., correlation =
                corfit$consensus)
 
 fit2 <- contrasts.fit(fit, contr.matrix)
@@ -380,23 +379,18 @@ fit2_EC_neun <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_ne
 fit2_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_CA1_rest.Rdata")
 fit2_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/fit2_EC_rest.Rdata")
 
-results_fit2_CA1neun<- decideTests(fit2_CA1_neun)
-summary_fit2_CA1neun <- summary(results_fit2_CA1neun)
+results_fit2<- decideTests(fit2_CA1_neun)
+summary_fit2 <- summary(results_fit2_CA1neun)
 
 summary_fit2_CA1neun
 
-results_fit2_ECrest <- decideTests(fit2_CA1_neun)
-summary_fit2_ECrest <- summary(results_fit2_ECrest)
 
-summary_fit2_ECrest
-
-
-de_genes_toptable_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
+de_genes_toptable_CA1 <- topTable(fit2, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
 de_genes_toptable_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
 de_genes_toptable_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5) 
 de_genes_toptable_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05, adjust.method = "fdr",lfc = 0.5) 
 
-de_results_CA1 <- topTable(fit2_CA1_neun, coef = 1, sort.by = "P", n = Inf)
+de_results_CA1 <- topTable(fit2, coef = 1, sort.by = "P", n = Inf)
 de_results_EC <- topTable(fit2_EC_neun, coef = 1, sort.by = "P", n = Inf)
 de_results_CA1_rest <- topTable(fit2_CA1_rest, coef = 1, sort.by = "P", n = Inf)
 de_results_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "P", n = Inf)
@@ -446,19 +440,19 @@ hj[1:20,]
 ll[c(1:10, 283:292),]
 
 
-de_results_EC_rest %>% 
+de_results_CA1 %>% 
   mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
                      ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
   ggplot(aes(logFC, -log10(P.Value), col = DE)) + 
   geom_point(shape = 1, size = 1) + 
-  geom_text_repel(data = de_genes_toptable_EC_rest %>% 
+  geom_text_repel(data = de_genes_toptable_CA1 %>% 
                     mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP", 
                                        ifelse(logFC <0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>%
                     rownames_to_column(), aes(label = rowname)) +
   theme_bw() +
   xlab("Log-fold-change") +
   ylab("-log10 P value") +
-  ggtitle("WW v CC (spe_EC_rest_ruv_post)") +
+  ggtitle("WW v CC (spe_CA1_neun_ruv_post)") +
   scale_color_manual(values = c("blue","gray","red")) +
   theme(text = element_text(size=15))
 
@@ -488,63 +482,21 @@ de_genes_toptable_EC %>%
 ######################
 ### Gene ontology - enrichr
 
-dbs <- listEnrichrDbs()
-
-head(dbs)
-
-
-dbs <- c("GO_Biological_Process_2023", "GO_Cellular_Component_2023", "GO_Molecular_Function_2023")
-
-
-rownames(de_results)
-x <- rownames(top_n(de_results, 25))
-
-spe_CA1_neun_ruv_post_enrich <- enrichr(c("Mapt",     "Car4"   ,       "Slc35f1"   ,    "Tbr1"   ,       "Hrk"         ,  "Lmbrd2"     ,   "Gfap"    ,      "Crym"     ,     "Cap1"  ,        "Celf2"     ,    "Ptprn2"  ,      "Tspan5"     ,   "App"   ,        "Cyfip2"   ,     "Acap2" ,"Grina"     ,    "Tuba1a"    ,    "Txndc15" ,      "Zbtb18"      ,  "Atp2b2"   ,     "Sncb"     ,     "Epha5"      ,   "Pcsk2"     ,    "Marcksl1"   ,   "Stim2"   ,      "Igfbp4"   ,     "Tmsb4x"    ,    "Rps24"       ,  "Slc30a3" ,      "Wasf1" ), dbs)
-spe_CA1_rest_ruv_post_enrich <- enrichr(c("Mapt"  ,    "Gfap"   ,       "Ctsd"      ,    "C4b"       ,    "Ubb"    ,       "Cyfip2"    ,    "Nrgn"    ,      "Ctss"     ,     "Itm2b"     ,    "Serpina3n"  ,   "Hrk"     ,      "Ncdn"     ,     "Calm2"   , "Zbtb18"  ,      "C1qa"      ,    "Ppp3ca"    ,    "Mt1"     ,      "Fkbp1a"   ,     "Scn1b"    ,     "Cfl1"       ,   "App"    ,       "Hexb"       ,   "Ppp3r1"   ,     "B2m"      ,     "Clu"     ,      "Capza2"   ,"Actb"    ,      "Thy1"      ,    "Actr2"   ,      "Mt2"), dbs)
-spe_EC_neun_ruv_post_enrich <- enrichr(c("Mapt"     ,     "Gfap"      ,    "Ptprn2"    ,    "Cst3"      ,    "Apoe"      ,    "Aldoa"     ,    "Smc3"      ,    "Ptgds"    ,     "Fer1l6"      ,  "Fgf14"  ,       "Esyt2"  ,      "Glul"  ,        "Slc17a7"  , "Ndrg2"    ,     "C1qa"  ,        "Aldoc"     ,    "Sncb"    ,      "Cbx8"      ,    "Mdh1"      ,    "Zwint"     ,    "Syn2"    ,      "Nap1l5"     ,   "Atp1a2"    ,    "Mt1"    ,       "Gapdh"     ,    "Nsf" , "Tmc5"    ,      "Stmn1"    ,     "Rab3a"   ,      "Atp6v0c"), dbs)
-spe_EC_rest_ruv_post_enrich <- enrichr(c("Mapt"   ,     "Gfap"    ,      "Ctsd"     ,     "Ptprn2"      ,  "Camk2n1"    ,   "C1qa"    ,      "C4b"    ,       "Ctss"      ,    "Id3"   ,        "Fer1l6"    ,    "Nrsn1"     ,    "Cst3"   ,       "Id2"    ,"Ptgds"   ,      "Ighm"    ,      "Smc3"     ,     "Cplx1"      ,   "Ankrd12"   ,    "Cbx8"    ,      "Tmsb4x"  ,      "Plp1"     ,     "C1qc"    ,      "Clu"      ,     "Cox8a"    ,     "Gm52800"     ,  "Nfasc"   , "Cd81"   ,       "Cd9"      ,     "Tyrobp"    ,    "C1qb"), dbs)
-
-plotEnrich(spe_CA1_neun_ruv_post_enrich[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
-plotEnrich(spe_CA1_rest_ruv_post_enrich[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
-plotEnrich(spe_EC_neun_ruv_post_enrich[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
-plotEnrich(spe_EC_rest_ruv_post_enrich[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
-
-
-
-#whole gene sets
-
-install.packages("tibble")
-library(tibble)
-library(tidyverse)
-
-de_genes_toptable <- topTable(fit2, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5)
 offTargets <- c("Wdr60", "Esyt2", "Ncapg2","Ptprn2","Fgf14")
 
-de_genes_toptable <- de_genes_toptable[-which(rownames(de_genes_toptable) %in% offTargets),]
+de_genes_toptable <- de_genes_toptable_CA1[-which(rownames(de_genes_toptable_CA1) %in% offTargets),]
 
 whole_spe_CA1_neun <- enrichr(rownames(de_genes_toptable), dbs)
 
-plotEnrich(whole_spe_CA1_neun[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
-
-
-
+plotEnrich(whole_spe_CA1_neun[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
 
 
 
 ######################
 #EWCE
 
-mouseCTD <- ewceData::ctd()
-
-#Let's use an example topTable for one brain region
-#subset significant DEG's from your toptables 
-de_genes_toptable_EC_rest <- topTable(fit2_EC_rest, coef = 1, sort.by = "p", n = Inf,p.value = 0.05,adjust.method = "fdr",lfc = 0.5)
-offTargets <- c("Wdr60", "Esyt2", "Ncapg2","Ptprn2","Fgf14")
-#Manually remove any known off-targets
-de_genes_toptable_EC_rest <- de_genes_toptable_EC_rest[-which(rownames(de_genes_toptable_EC_rest) %in% offTargets),]
-
 #finally subset the list of names for your DEGs
-topGenes <- rownames(de_genes_toptable_EC_rest)
+topGenes <- rownames(de_genes_toptable)
 
 
 # This tests for enrichment in the mouse single cell dataset
@@ -563,7 +515,7 @@ saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.R
 results_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
 
 #Take out the enrichment results
-ewceRes <- results_EC_rest$results
+ewceRes <- results$results
 
 
 # This method only tests for positive enrichment (sd_from_mean < 0 == NA)
@@ -920,6 +872,7 @@ module_df[module_df$gene_id == "Gfap",]
 module_df[module_df$gene_id == "Pfkm",]
 module_df[module_df$gene_id == "Mapt",]
 
+#this shouldve been done before but it works here
 module_df$gene_id <- sub("_01$", "", module_df$gene_id)
 
 WGCNA_brown <-module_df$gene_id[module_df$colors == "brown"]
