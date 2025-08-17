@@ -167,11 +167,9 @@ pca_results_tmm <- reducedDim(spe_tmm, "PCA")
 
 
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = Group)
-
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = grossRegion)
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = population)
-
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = lib_size, n_dimension = 6)
 
 
@@ -256,7 +254,7 @@ for(i in seq(5)){
   spe_CA1_neun_ruv_post <- geomxBatchCorrection(spe_CA1_neun, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                 NCGs = metadata(spe_CA1_neun)$NCGs, k = i)
   
-  print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
+  print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("spe_CA1_neun_ruv_post, k = ", i)))
   
 }
 
@@ -264,14 +262,14 @@ for(i in seq(5)){
   spe_CA1_rest_ruv_post <- geomxBatchCorrection(spe_CA1_rest, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                 NCGs = metadata(spe_CA1_rest)$NCGs, k = i)
   
-  print(plotPairPCA(spe_CA1_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
+  print(plotPairPCA(spe_CA1_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("spe_CA1_rest_ruv_post, k = ", i)))
   
 }
 
 for(i in seq(5)){
   spe_EC_neun_ruv_post <- geomxBatchCorrection(spe_EC_neun, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                NCGs = metadata(spe_EC_neun)$NCGs, k = i)
-  print(plotPairPCA(spe_CA1_neun_ruv_post, assay = 2, n_dimension = 4, color = Neuronal, title = paste0("k = ", i))+scale_fill_viridis_c())
+  print(plotPairPCA(spe_EC_neun_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("spe_EC_neun_ruv_post, k = ", i)))
   
   
 }
@@ -280,7 +278,7 @@ for(i in seq(5)){
   spe_EC_rest_ruv_post <- geomxBatchCorrection(spe_EC_rest, factors = c("Group", "Astro", "Oligo", "Immune_Vascular"), 
                                                NCGs = metadata(spe_EC_rest)$NCGs, k = i)
   
-  print(plotPairPCA(spe_EC_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
+  print(plotPairPCA(spe_EC_rest_ruv_post, assay = 2, n_dimension = 4, color = Group, title = paste0("spe_EC_rest_ruv_post, k = ", i)))
   
 }
 
@@ -301,15 +299,19 @@ corPCtest(speOb = spe_tmm, pcaOb =  pca_results_tmm, nPC = 10, colLabs = c("Slid
 
 print(plotPairPCA(spe_tmm, assay = 2, n_dimension = 4, color = lib_size))
 
-corPCtest(speOb = spe_tmm, pcaOb =  pca_results_tmm, nPC = 10, colLabs = c("SlideName", "lib_size", "AOISurfaceArea", "population", "grossRegion", "Group"))
-
-
 assay(spe_tmm,2)
-pca_results_ruv <- reducedDim(assay(spe_ruv,2), "PCA")
+
+spe <- findNCGs(spe, batch_name = "SlideName", top_n = 300)
+
+for(i in seq(5)){
+  spe_ruv <- geomxBatchCorrection(spe, factors = c("Group","grossRegion", "population"), 
+                                  NCGs = metadata(spe)$NCGs, k = i)
+print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Group, title = paste0("k = ", i)))
+
+}
+
+pca_results_ruv <- reducedDim(spe_ruv, "PCA")
 corPCtest(speOb = spe_ruv, pcaOb =  pca_results_ruv, nPC = 10, colLabs = c("SlideName", "lib_size", "AOISurfaceArea", "population", "grossRegion", "Group"))
-
-corPCtest(speOb = spe_lrb, pcaOb =  PCA_results_spel, nPC = 10, colLabs = c("SlideName", "lib_size", "AOISurfaceArea", "population", "grossRegion", "Group"))
-
 
 
 
@@ -488,7 +490,7 @@ de_genes_toptable <- de_genes_toptable_CA1[-which(rownames(de_genes_toptable_CA1
 
 whole_spe_CA1_neun <- enrichr(rownames(de_genes_toptable), dbs)
 
-plotEnrich(whole_spe_CA1_neun[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+plotEnrich(whole_spe_CA1_neun[[3]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value", title = "biological function CA1 neun")
 
 
 
@@ -501,21 +503,16 @@ topGenes <- rownames(de_genes_toptable)
 
 # This tests for enrichment in the mouse single cell dataset
 # Start out with 100 for quick running but when we run the analysis "finally" make this 10,000 reps
-results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
+results_EWCE <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
                                            sctSpecies = "mouse",
                                            genelistSpecies = "mouse",
                                            hits = topGenes, 
-                                           reps = 100,
+                                           reps = 10000,
                                            annotLevel = 1)
 
-saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
-results_CA1_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_CA1_rest.Rdata")
-
-saveRDS(results, file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
-results_EC_rest <- readRDS(file = "/Users/fergusfones/Desktop/Nanostring/results_EC_rest.Rdata")
 
 #Take out the enrichment results
-ewceRes <- results$results
+ewceRes <- results_EWCE$results
 
 
 # This method only tests for positive enrichment (sd_from_mean < 0 == NA)
@@ -536,6 +533,7 @@ ewceRes %>%
   ylab("SD From Mean")+
   xlab("Cell type")+
   theme_bw()+
+  ggtitle("CA1 neun EWCE")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 
 
@@ -647,10 +645,11 @@ vsd <- varianceStabilizingTransformation(dds)
 wpn_vsd <- getVarianceStabilizedData(dds)
 
 rv_wpn <- rowVars(wpn_vsd) 
+# plot this ??
 summary(rv_wpn)
 
-q75_wpn <- quantile( rowVars(wpn_vsd), .75)  # <= original
-q95_wpn <- quantile( rowVars(wpn_vsd), .95)  # <= changed to 95 quantile to reduce dataset
+q75_wpn <- quantile( rowVars(wpn_vsd), .75)  
+q95_wpn <- quantile( rowVars(wpn_vsd), .95)  
 expr_normalized <- wpn_vsd[ rv_wpn > q75_wpn, ]
 
 
@@ -669,7 +668,7 @@ expr_normalized_df %>% ggplot(., aes(x = name, y = value)) +
   ) +
   ylim(0, NA) +
   labs(
-    title = "Normalized and 75 quantile Expression_EC_rest",
+    title = "Normalized and 95 quantile Expression",
     x = "treatment",
     y = "normalized expression"
   )
@@ -779,7 +778,6 @@ module_df <- data.frame(
   colors = labels2colors(netwk$colors)
 )
 
-module_df[1:5,]
 
 MEs0 <- moduleEigengenes(input_mat, mergedColors)$eigengenes
 MEs0 <- orderMEs(MEs0)
@@ -802,7 +800,7 @@ traits_numeric <- ifelse(traits == "WW", 0 ,1)
 
 # module trait correlation
 # adjust rows in MEs0 to just show modules
-moduleTraitCor = stats::cor(MEs0[,1:33],traits_numeric , use = "p");
+moduleTraitCor = stats::cor(MEs0[,1:38],traits_numeric , use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(MEs0))
 
 
@@ -821,8 +819,8 @@ par(mar = c(2, 2, 3, 3), cex.main = 1.5, cex.axis = 1, cex.lab = 0.7)  # Decreas
 labeledHeatmap(
   Matrix = moduleTraitCor,
   xLabels = colnames(traits_numeric),
-  yLabels = names(MEs0[,1:33]),
-  ySymbols = names(MEs0[,1:33]),
+  yLabels = names(MEs0[,1:38]),
+  ySymbols = names(MEs0[,1:38]),
   colorLabels = FALSE,
   colors = colorRampPalette(c("blue", "white", "red"))(50),  # Change color scheme if needed
   textMatrix = textMatrix,
@@ -837,7 +835,7 @@ labeledHeatmap(
 table(module_df$colors)
 
 # pick out a few modules of interest here
-modules_of_interest = c("brown", "turquoise", "red", "blue", "magenta" )
+modules_of_interest = c("turquoise", "yellow", "black")
 
 # Pull out list of genes in that module
 submod = module_df %>%
@@ -877,48 +875,50 @@ module_df$gene_id <- sub("_01$", "", module_df$gene_id)
 
 WGCNA_brown <-module_df$gene_id[module_df$colors == "brown"]
 WGCNA_black <-module_df$gene_id[module_df$colors == "black"]
+WGCNA_yellow <-module_df$gene_id[module_df$colors == "yellow"]
+WGCNA_turq <-module_df$gene_id[module_df$colors == "turquoise"]
 
-module_enriched <- enrichr(WGCNA_black, dbs)
+module_enriched <- enrichr(WGCNA_turq, dbs)
 
 # maybe add p value threshold at 0.05
 
-plotEnrich(module_enriched[[2]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
+plotEnrich(module_enriched[[1]], showTerms = 20, numChar = 120, y = "Count", orderBy = "P.value")
 
 
 
 #finally subset the list of names for your DEGs
-topGenes <- WGCNA_brown
+topGenes_WGCNA <- WGCNA_turq
 
 
 # This tests for enrichment in the mouse single cell dataset
 # Start out with 100 for quick running but when we run the analysis "finally" make this 10,000 reps
-results <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
+results_WGCNA <- EWCE::bootstrap_enrichment_test(sct_data = mouseCTD,
                                            sctSpecies = "mouse",
                                            genelistSpecies = "mouse",
-                                           hits = topGenes, 
+                                           hits = topGenes_WGCNA, 
                                            reps = 10000,
                                            annotLevel = 1)
 
 
 #Take out the enrichment results
-ewceRes <- results$results
+ewceResWGCNA <- results_WGCNA$results
 
 
 # This method only tests for positive enrichment (sd_from_mean < 0 == NA)
-ewceRes[which(ewceRes$sd_from_mean < 0),"sd_from_mean"] <- NA
+ewceResWGCNA[which(ewceResWGCNA$sd_from_mean < 0),"sd_from_mean"] <- NA
 
 #annotate significance
-ewceRes$sigAnnot <- NA
-ewceRes$sigAnnot[ewceRes$q < 0.05] <- "*"
-ewceRes$sigAnnot[ewceRes$q < 0.0001] <- "**"
-ewceRes$sigAnnot[ewceRes$q < 1e-10] <- "***"
+ewceResWGCNA$sigAnnot <- NA
+ewceResWGCNA$sigAnnot[ewceResWGCNA$q < 0.05] <- "*"
+ewceResWGCNA$sigAnnot[ewceResWGCNA$q < 0.0001] <- "**"
+ewceResWGCNA$sigAnnot[ewceResWGCNA$q < 1e-10] <- "***"
 
 #Finally, plot your cell types
-ewceRes %>%
+ewceResWGCNA %>%
   ggplot(aes(x = as.factor(CellType), y = sd_from_mean))+
   geom_bar(stat = "identity")+
-  scale_y_continuous(expand = c(0,0),limits = c(0,max(ewceRes$sd_from_mean,na.rm = T) + max(ewceRes$sd_from_mean,na.rm = T)/10))+
-  geom_text(aes(label = sigAnnot, y = sd_from_mean + max(ewceRes$sd_from_mean,na.rm = T)/20), size = 8)+
+  scale_y_continuous(expand = c(0,0),limits = c(0,max(ewceResWGCNA$sd_from_mean,na.rm = T) + max(ewceResWGCNA$sd_from_mean,na.rm = T)/10))+
+  geom_text(aes(label = sigAnnot, y = sd_from_mean + max(ewceResWGCNA$sd_from_mean,na.rm = T)/20), size = 8)+
   ylab("SD From Mean")+
   xlab("Cell type")+
   theme_bw()+
