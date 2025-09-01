@@ -59,3 +59,22 @@ cellSubPropLong<- melt(cellSubProp,id.vars = "BroadCell")
 cellSubPropLong <- cellSubPropLong %>% group_by(variable,BroadCell) %>% reframe(sum(value))
 
 cellSubProp  <- dcast(cellSubPropLong,variable~BroadCell)
+colData(spe_cpm)[cellSubPropLong$variable,c("population","Group","grossRegion")]
+cellSubPropLong <- cbind(cellSubPropLong,colData(spe_cpm)[cellSubPropLong$variable,c("population","Group","grossRegion")])
+cellSubPropLong <- cellSubPropLong[order(cellSubPropLong$Group,cellSubPropLong$grossRegion),]
+cellSubPropLong$variable <- as.character(cellSubPropLong$variable)
+cellSubPropLong$variable <- factor(cellSubPropLong$variable, levels = unique(cellSubPropLong$variable))
+cellSubPropLong$Group <- factor(cellSubPropLong$Group,levels = c("WW","CC"))
+
+
+pdf("NewAllenDecon.pdf",width = 6, height = 8)
+ggplot(cellSubPropLong,aes(y = `sum(value)`, x = as.factor(BroadCell), color = as.factor(Group)))+
+  geom_boxplot()+ 
+  geom_point(position=position_jitterdodge(),alpha = 0.7,size = 0.6)+
+  facet_grid(population~grossRegion)+
+  scale_y_continuous(limits = c(0,1), expand = c(0,0.01))+
+  theme_bw()+
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(color = "Transgene Group",x = "Broad Cell Type (Allen Brain Atlas)", y = "Proportion")+
+  scale_color_brewer(palette = "Set2",labels = c("Wildtype","Transgenic"))
+dev.off() 
