@@ -12,4 +12,5 @@ This project has concluded
 
 Neuronal cell populations processed by the NanoString GeoMx DSP were found to be contaminated with astrocytic cells. This was a characteristic of the tauopathy of the tissue profiled. However, controlling for cell type proportions allows for a pure neuronal population which can be used in differential expression analysis and other downstream analyses.
 
-## Authors: Fergus Fones & Joshua Harvey, Szi Kay Leung
+## Authors
+Fergus Fones & Joshua Harvey, Szi Kay Leung
